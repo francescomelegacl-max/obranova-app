@@ -91,12 +91,13 @@ function PartidaCard({ p, cats, updP, delP, t }) {
 export default function TabCostos({ partidas, cats, addPartida, updP, delP, addFromListino, listino, t }) {
   const [filterCat,  setFilterCat]  = useState(null);
   const [showExtras, setShowExtras] = useState(false);
-  const [isMobile,   setIsMobile]   = useState(() => window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
   }, []);
 
   const cd       = useMemo(() => partidas.reduce((s, p) => s + p.cant * p.pu, 0), [partidas]);

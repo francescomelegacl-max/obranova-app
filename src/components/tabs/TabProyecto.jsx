@@ -1,5 +1,5 @@
 // ─── components/tabs/TabProyecto.jsx ────────────────────────────────────────
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tip } from "../UI";
 import { ESTADOS, ESTADO_COLORS, ESTADO_BG } from "../../utils/constants";
 import ModalTemplates from "../ModalTemplates";
@@ -18,9 +18,13 @@ export default function TabProyecto({
 }) {
   const [showTemplates,   setShowTemplates]   = useState(false);
   const [templateApplied, setTemplateApplied] = useState("");
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useState(() => { const fn = () => setIsMobile(window.innerWidth < 768); window.addEventListener("resize", fn); return () => window.removeEventListener("resize", fn); }, []);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
   const venceDate = info.fecha
     ? new Date(new Date(info.fecha).getTime() + validez * 86400000).toLocaleDateString("es-CL")
     : "—";
@@ -260,31 +264,35 @@ export default function TabProyecto({
         {condPago === "cuotas" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {cuotas.map((c, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr auto", gap: 6, alignItems: "center" }}>
-                <input
-                  value={c.desc}
-                  onChange={e => { const nc = [...cuotas]; nc[i] = { ...nc[i], desc: e.target.value }; setCuotas(nc); }}
-                  placeholder={t.cuotaLabel + " " + (i + 1)}
-                  style={{ padding: "6px 8px", border: "1px solid #e2e8f0", borderRadius: 7, fontSize: 12, color: "#1a365d" }}
-                />
-                <input
-                  type="number"
-                  value={c.monto}
-                  onChange={e => { const nc = [...cuotas]; nc[i] = { ...nc[i], monto: parseFloat(e.target.value) || 0 }; setCuotas(nc); }}
-                  placeholder="Monto"
-                  style={{ padding: "6px 8px", border: "1px solid #e2e8f0", borderRadius: 7, fontSize: 12, color: "#1a365d" }}
-                />
-                <input
-                  type="date"
-                  value={c.fecha}
-                  onChange={e => { const nc = [...cuotas]; nc[i] = { ...nc[i], fecha: e.target.value }; setCuotas(nc); }}
-                  style={{ padding: "6px 8px", border: "1px solid #e2e8f0", borderRadius: 7, fontSize: 12, color: "#1a365d" }}
-                />
-                <button
-                  onClick={() => setCuotas(cuotas.filter((_, j) => j !== i))}
-                  aria-label="Eliminar cuota"
-                  style={{ background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: 7, cursor: "pointer", color: "#c53030", padding: "5px 8px", fontSize: 12 }}
-                >✕</button>
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6, padding: "10px", background: "#f7fafc", borderRadius: 9, border: "1px solid #e2e8f0" }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input
+                    value={c.desc}
+                    onChange={e => { const nc = [...cuotas]; nc[i] = { ...nc[i], desc: e.target.value }; setCuotas(nc); }}
+                    placeholder={t.cuotaLabel + " " + (i + 1)}
+                    style={{ flex: 1, padding: "6px 8px", border: "1px solid #e2e8f0", borderRadius: 7, fontSize: 12, color: "#1a365d" }}
+                  />
+                  <button
+                    onClick={() => setCuotas(cuotas.filter((_, j) => j !== i))}
+                    aria-label="Eliminar cuota"
+                    style={{ background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: 7, cursor: "pointer", color: "#c53030", padding: "5px 10px", fontSize: 13, fontWeight: 700, flexShrink: 0 }}
+                  >✕</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                  <input
+                    type="number"
+                    value={c.monto}
+                    onChange={e => { const nc = [...cuotas]; nc[i] = { ...nc[i], monto: parseFloat(e.target.value) || 0 }; setCuotas(nc); }}
+                    placeholder="Monto"
+                    style={{ padding: "6px 8px", border: "1px solid #e2e8f0", borderRadius: 7, fontSize: 12, color: "#1a365d" }}
+                  />
+                  <input
+                    type="date"
+                    value={c.fecha}
+                    onChange={e => { const nc = [...cuotas]; nc[i] = { ...nc[i], fecha: e.target.value }; setCuotas(nc); }}
+                    style={{ padding: "6px 8px", border: "1px solid #e2e8f0", borderRadius: 7, fontSize: 12, color: "#1a365d" }}
+                  />
+                </div>
               </div>
             ))}
             <button
