@@ -74,7 +74,7 @@ function RigaCalc({ riga, onUpdate, onDelete, catColor }) {
 }
 
 // ── Componente principale ─────────────────────────────────────────────────────
-export default function TabCalcolatore({ listino = [], standalone = false }) {
+export default function TabCalcolatore({ listino = [], standalone = false, addPartida, cats = [], onToast }) {
 
   const [righe,      setRighe]      = useState([]);
   const [nome,       setNome]       = useState("");
@@ -215,6 +215,41 @@ export default function TabCalcolatore({ listino = [], standalone = false }) {
     const texto  = `🔨 *${nome || "Presupuesto rápido"}*\n\n${lineas}\n\n📊 Margen ${margine}%\n✅ *TOTAL: $${total.toLocaleString("es-CL")}*${iva?" (IVA inc.)":""}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
   };
+
+  // ── Aggiungi righe a Costos ───────────────────────────────────────────────────
+  const [aggiuntoACostos, setAggiuntoACostos] = useState(false);
+  const handleAggiungiACostos = useCallback(() => {
+    if (!addPartida || righe.length === 0) return;
+    const catDefault = cats[0] || "Obra Gruesa";
+    righe.filter(r => r.desc.trim()).forEach(r => {
+      addPartida({
+        desc:   r.desc,
+        cat:    r.tipo === "mano" ? (cats.find(c => c.toLowerCase().includes("mano") || c.toLowerCase().includes("obra")) || catDefault) : catDefault,
+        qty:    r.cant,
+        unit:   r.unidad,
+        price:  r.pu,
+        nota:   `[Calculadora: ${nome || "cálculo rápido"}]`,
+      });
+    });
+    setAggiuntoACostos(true);
+    onToast?.(`✅ ${righe.length} ítem${righe.length > 1 ? "s" : ""} agregados a Costos`);
+    setTimeout(() => setAggiuntoACostos(false), 3000);
+  }, [addPartida, righe, cats, nome, onToast]);
+
+  // ── WhatsApp: genera PDF en ventana nueva y comparte texto con total ──────────
+  const handleWhatsAppConPDF = useCallback(() => {
+    // Prima apre il PDF
+    handlePDF();
+    // Poi dopo 800ms apre WhatsApp con messaggio + istruzioni per allegare
+    setTimeout(() => {
+      const total = iva ? totals.totIva : totals.total;
+      const texto = `🔨 *${nome || "Presupuesto rápido"}*\n\n` +
+        `📊 ${righe.filter(r=>r.cant>0&&r.pu>0).length} ítems · Margen ${margine}%\n` +
+        `✅ *TOTAL: $${total.toLocaleString("es-CL")}*${iva ? " (IVA inc.)" : ""}\n\n` +
+        `_(Se adjunta el PDF con el detalle completo)_`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
+    }, 800);
+  }, [handlePDF, righe, nome, margine, iva, totals]);
 
   // ── Listino filtrato ──────────────────────────────────────────────────────────
   const listinoFiltrato = useMemo(() =>
@@ -360,14 +395,32 @@ export default function TabCalcolatore({ listino = [], standalone = false }) {
                 style={{ padding:"11px",background:saved?"#276749":"#1a365d",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13,transition:"all .2s" }}>
                 {saved ? "✅ Guardado" : "💾 Guardar cálculo"}
               </button>
+
+              {/* ── Aggiungi a Costos ── */}
+              {addPartida && (
+                <button onClick={handleAggiungiACostos}
+                  style={{ padding:"11px",background:aggiuntoACostos?"#276749":"#c05621",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13,transition:"all .2s" }}>
+                  {aggiuntoACostos ? "✅ Agregado a Costos" : "➕ Agregar a Costos"}
+                </button>
+              )}
+
               <button onClick={handlePDF}
                 style={{ padding:"11px",background:"#2b6cb0",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13 }}>
                 🖨️ Exportar PDF
               </button>
-              <button onClick={handleWhatsApp}
-                style={{ padding:"11px",background:"#25D366",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13 }}>
-                💬 Compartir WhatsApp
-              </button>
+
+              {/* ── WhatsApp: PDF + mensaje ── */}
+              <div style={{ display:"flex",gap:6 }}>
+                <button onClick={handleWhatsAppConPDF}
+                  style={{ flex:1,padding:"11px 8px",background:"#25D366",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:12 }}>
+                  💬 WA + PDF
+                </button>
+                <button onClick={handleWhatsApp}
+                  style={{ padding:"11px 10px",background:"#1ead57",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontSize:16 }}
+                  title="Solo mensaje de texto">
+                  💬
+                </button>
+              </div>
             </div>
           </div>
         </div>

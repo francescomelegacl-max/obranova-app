@@ -4,6 +4,7 @@ import { onAuthStateChanged, signOut }      from "firebase/auth";
 import { auth }                             from "./lib/firebase";
 import { useProyecto }                      from "./hooks/useProyecto";
 import { useFirestore }                     from "./hooks/useFirestore";
+import { useKits }                          from "./hooks/useKits";
 import { useWorkspace }                     from "./hooks/useWorkspace";
 import { useMagazzino }                     from "./hooks/useMagazzino";
 import { useFirma }                         from "./hooks/useFirma";
@@ -49,6 +50,7 @@ const TabDashboard  = lazy(() => import("./components/tabs/TabDashboard"));
 const TabCostos     = lazy(() => import("./components/tabs/TabCostos"));
 const TabProyecto   = lazy(() => import("./components/tabs/TabProyecto"));
 const TabCalcolatore= lazy(() => import("./components/tabs/TabCalcolatore"));
+const TabKitMateriali= lazy(() => import("./components/tabs/TabKitMateriali"));
 const TabAgenda     = lazy(() => import("./components/tabs/TabAgenda"));
 const PaginaFirma   = lazy(() => import("./components/FirmaPage"));
 
@@ -122,6 +124,11 @@ export default function App() {
     fatture, loadFatture, creaFattura, togglePagata, eliminaFattura,
   } = useFatture({ workspaceId: workspace?.id, onToast: showToast });
 
+  const {
+    kits, cargando: cargandoKits,
+    loadKits, saveKit, deleteKit, importarKitPredefinito,
+  } = useKits({ onToast: showToast, workspaceId: workspace?.id });
+
   // ── Routing firma pubblica ────────────────────────────────────────────────
   const firmaToken = useMemo(() => {
     const match = window.location.pathname.match(/^\/firma\/([a-f0-9]+)$/);
@@ -160,7 +167,7 @@ export default function App() {
 
   useEffect(() => {
     if (!workspace) return;
-    Promise.all([loadProyectos(), loadListino(), loadCats(), loadMagazzino(), loadMovimenti(), loadFatture()]).then(([list]) => {
+    Promise.all([loadProyectos(), loadListino(), loadCats(), loadMagazzino(), loadMovimenti(), loadFatture(), loadKits()]).then(([list]) => {
       if (list?.length > 0 && !proy.currentId) loadProject(list[0]);
     });
   }, [workspace?.id]); // eslint-disable-line
@@ -226,6 +233,7 @@ export default function App() {
     { icon:"🧾", label: t.fatture      || "Facturas" },
     { icon:"📈", label: t.storico },
     { icon:"🔨", label: t.calcolatore  || "Calculadora" },
+    { icon:"📦", label: "Kits" },
     { icon:"📅", label: t.agenda       || "Agenda" },
     { icon:"🇨🇱", label: t.siiTab      || "SII" },
     { icon:"⚙️", label: t.impostazioni || "Ajustes" },
@@ -506,12 +514,13 @@ export default function App() {
             {tab===7  && <TabMagazzino items={magItems} movimenti={movimenti} itemsInAlert={itemsInAlert} loading={magLoading} cats={cats} proyectos={proyectos} onSaveItem={saveMagItem} onDeleteItem={deleteMagItem} onMovimento={registraMovimento} />}
             {tab===8  && <TabFatture proyectos={proyectos} fatture={fatture} onCreaFattura={creaFattura} onTogglePagata={togglePagata} onEliminaFattura={eliminaFattura} />}
             {tab===9  && <TabStorico proyectos={proyectos} t={t} />}
-            {tab===10 && <TabCalcolatore listino={listino} />}
+            {tab===10 && <TabCalcolatore listino={listino} addPartida={addPartida} cats={cats} onToast={showToast} />}
             {tab===11 && <TabAgenda proyectos={proyectos} fatture={fatture} onOpenProject={handleOpenProject} />}
             {tab===12 && <TabSII proyectos={proyectos} workspaceId={workspace?.id} t={t} onToast={showToast} />}
             {tab===13 && <TabSettings workspace={workspace} members={members} myRole={myRole} can={can} onInvite={(email,role) => inviteMember(email,role,workspace.id)} onChangeRole={changeMemberRole} onRemoveMember={removeMember} onUpdateName={updateWorkspaceName} onGoToPiani={() => setTab(15)} />}
             {tab===14 && <TabHelp t={t} />}
             {tab===15 && <TabPiani workspace={workspace} />}
+            {tab===16 && <TabKitMateriali kits={kits} cargando={cargandoKits} onSaveKit={saveKit} onDeleteKit={deleteKit} onImportarPredefinito={importarKitPredefinito} addPartida={addPartida} cats={cats} onToast={showToast} />}
           </ErrorBoundary>
         </Suspense>
       </main>

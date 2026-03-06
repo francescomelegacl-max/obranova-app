@@ -106,6 +106,67 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
 
   return (
     <div>
+      {/* ── Pannello Compartir ───────────────────────────────────────────────── */}
+      <div className="no-print" style={{ background:"white",borderRadius:12,padding:"14px 18px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)" }}>
+        <div style={{ fontWeight:700,fontSize:13,color:"#1a365d",marginBottom:12 }}>📤 Compartir presupuesto</div>
+        <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
+
+          {/* PDF */}
+          <button onClick={() => window.print()}
+            style={{ flex:1,minWidth:140,padding:"11px 14px",background:"#2b6cb0",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
+            🖨️ Descargar PDF
+          </button>
+
+          {/* WhatsApp + PDF: descarga PDF primero, luego abre WA con link */}
+          {info.telefono && (() => {
+            const total = iva ? totals.totalIva : totals.total;
+            const num = (info.telefono||"").replace(/[\s\-\+\(\)]/g,"");
+            const norm = num ? (num.startsWith("56")?num:num.startsWith("9")?`56${num}`:`569${num}`) : "";
+            const msgWA = `Hola ${info.cliente||""}👋\n\nTe adjunto el presupuesto para *${info.descripcion||"tu proyecto"}*.\n\n💰 *Total: $${total.toLocaleString("es-CL")} CLP*${iva?" (IVA inc.)":""}\n\n📄 _(Revisa el PDF adjunto con el detalle completo)_\n\n_${info.empresa||"Obra Nova"}_`;
+            const waUrl = `https://wa.me/${norm}?text=${encodeURIComponent(msgWA)}`;
+            return (
+              <button
+                onClick={() => { window.print(); setTimeout(() => window.open(waUrl,"_blank","noopener,noreferrer"), 800); }}
+                style={{ flex:1,minWidth:140,padding:"11px 14px",background:"#25D366",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
+                💬 WA + PDF
+              </button>
+            );
+          })()}
+
+          {/* Solo WhatsApp testo */}
+          {info.telefono && (() => {
+            const total = iva ? totals.totalIva : totals.total;
+            const num = (info.telefono||"").replace(/[\s\-\+\(\)]/g,"");
+            const norm = num ? (num.startsWith("56")?num:num.startsWith("9")?`56${num}`:`569${num}`) : "";
+            const msgSimple = `Hola ${info.cliente||""}👋\n\nTe enviamos el presupuesto para *${info.descripcion||"tu proyecto"}* por *$${total.toLocaleString("es-CL")} CLP*${iva?" (IVA inc.)":""}.\n\nConsúltanos cualquier duda.\n\n_${info.empresa||"Obra Nova"}_`;
+            return (
+              <button
+                onClick={() => window.open(`https://wa.me/${norm}?text=${encodeURIComponent(msgSimple)}`,"_blank","noopener,noreferrer")}
+                style={{ padding:"11px 14px",background:"#1ead57",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6 }}
+                title="Solo mensaje de texto (sin PDF)">
+                💬 Solo WA
+              </button>
+            );
+          })()}
+
+          {/* Link vista cliente (para copiar) */}
+          {currentId && (
+            <button
+              onClick={() => { const url = `${window.location.origin}/firma/${currentId}`; navigator.clipboard?.writeText(url).then(() => {}).catch(()=>{}); window.open(`https://wa.me/?text=${encodeURIComponent(`Hola! Aquí puedes ver tu presupuesto en línea: ${url}`)}`, "_blank"); }}
+              style={{ padding:"11px 14px",background:"#553c9a",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6 }}
+              title="Comparte el link de vista cliente">
+              🔗 Link online
+            </button>
+          )}
+
+        </div>
+        {!info.telefono && (
+          <div style={{ marginTop:8,fontSize:11,color:"#a0aec0" }}>
+            💡 Agrega el teléfono del cliente en la pestaña Proyecto para activar WhatsApp
+          </div>
+        )}
+      </div>
+
       {/* Pannello firma digitale */}
       {onInviaFirma && (
         <div className="no-print" style={{ background: "linear-gradient(135deg,#276749,#38a169)", borderRadius: 12, padding: "14px 18px", marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
