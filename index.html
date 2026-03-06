@@ -20,11 +20,14 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
+      // Deregistra tutti i Service Worker vecchi e pulisce la cache
+      // così i nuovi deploy arrivano subito senza blocchi
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('SW registered'))
-            .catch(err => console.log('SW error:', err));
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(reg => reg.unregister());
+        });
+        caches.keys().then(keys => {
+          keys.forEach(key => caches.delete(key));
         });
       }
     </script>

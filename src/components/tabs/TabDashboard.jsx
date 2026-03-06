@@ -180,7 +180,7 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
       {/* KPI Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
         {kpis.map(k => (
           <div key={k.label} style={{
             background: k.bg, border: `1px solid ${k.color}22`,
@@ -196,7 +196,7 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
       {/* Panel Financiero */}
       <div style={{ background: "linear-gradient(135deg,#1a365d,#2d3748)", borderRadius: 12, padding: "18px 20px", color: "white" }}>
         <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>📊 Panel Financiero</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
           {[
             { label: "Facturación aceptada", value: fmt(dashStats.facturacion), icon: "💰", color: "#68d391" },
             { label: "Costo real",           value: fmt(dashStats.costoReal),   icon: "🔧", color: "#fc8181" },
@@ -213,7 +213,7 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
       </div>
 
       {/* ── GRAFICI RECHARTS ────────────────────────────────────────────────── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
 
         {/* Revenue mensile — LineChart + BarChart */}
         <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)", gridColumn: "1 / -1" }}>
