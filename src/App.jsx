@@ -233,12 +233,12 @@ export default function App() {
     { icon:"🧾", label: t.fatture      || "Facturas" },
     { icon:"📈", label: t.storico },
     { icon:"🔨", label: t.calcolatore  || "Calculadora" },
-    { icon:"📦", label: "Kits" },
     { icon:"📅", label: t.agenda       || "Agenda" },
     { icon:"🇨🇱", label: t.siiTab      || "SII" },
     { icon:"⚙️", label: t.impostazioni || "Ajustes" },
     { icon:"💎", label: "Planes" },
     { icon:"❓", label: t.tabHelp },
+    { icon:"📦", label: "Kits" },
   ], [t]);
 
   // ── Pagina pubblica firma ─────────────────────────────────────────────────
