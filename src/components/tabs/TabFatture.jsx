@@ -220,16 +220,25 @@ export function TabFatture({ proyectos, fatture, onCreaFattura, onTogglePagata, 
   const [proySelected, setProySelected] = useState(null);
   const [viewFattura, setViewFattura] = useState(null);
   const [filterStato, setFilterStato] = useState("Todos");
+  const [search,      setSearch]      = useState("");
 
   // Progetto corrente (quello aperto nell'app)
   const proyAceptados = proyectos.filter(p => p.estado === "Aceptado");
 
   const fattureFiltrate = useMemo(() => {
-    if (filterStato === "Todos")   return fatture;
-    if (filterStato === "Pagadas")  return fatture.filter(f => f.pagata);
-    if (filterStato === "Pendientes")  return fatture.filter(f => !f.pagata);
-    return fatture;
-  }, [fatture, filterStato]);
+    let list = [...fatture];
+    if (filterStato === "Pagadas")    list = list.filter(f => f.pagata);
+    if (filterStato === "Pendientes") list = list.filter(f => !f.pagata);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(f =>
+        (f.clienteNombre || "").toLowerCase().includes(q) ||
+        String(f.numero || "").includes(q) ||
+        (f.descripcionProy || "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [fatture, filterStato, search]);
 
   const totaleCobrado = useMemo(() => fatture.filter(f => f.pagata).reduce((s, f) => s + (f.importe || 0), 0), [fatture]);
   const totaleAttesa    = useMemo(() => fatture.filter(f => !f.pagata).reduce((s, f) => s + (f.importe || 0), 0), [fatture]);
@@ -328,18 +337,38 @@ export function TabFatture({ proyectos, fatture, onCreaFattura, onTogglePagata, 
         </div>
       )}
 
-      {/* Filtri fatture */}
-      <div style={{ background: "white", borderRadius: 12, padding: "10px 14px", boxShadow: "0 1px 4px rgba(0,0,0,.07)", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginRight: 4 }}>Historial facturas</div>
-        <div style={{ display: "flex", gap: 4, background: "#f0f4f8", borderRadius: 8, padding: 3 }}>
-          {["Todos", "Pagadas", "Pendientes"].map(v => (
-            <button key={v} onClick={() => setFilterStato(v)}
-              style={{ padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
-                background: filterStato === v ? "#2b6cb0" : "transparent",
-                color:      filterStato === v ? "white"   : "#718096" }}>
-              {v}
-            </button>
-          ))}
+      {/* Filtri + ricerca fatture */}
+      <div style={{ background: "white", borderRadius: 12, padding: "12px 14px", boxShadow: "0 1px 4px rgba(0,0,0,.07)", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginRight: 4 }}>Historial facturas</div>
+          <div style={{ display: "flex", gap: 4, background: "#f0f4f8", borderRadius: 8, padding: 3 }}>
+            {["Todos", "Pagadas", "Pendientes"].map(v => (
+              <button key={v} onClick={() => setFilterStato(v)}
+                style={{ padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
+                  background: filterStato === v ? "#2b6cb0" : "transparent",
+                  color:      filterStato === v ? "white"   : "#718096" }}>
+                {v}
+              </button>
+            ))}
+          </div>
+          <div style={{ marginLeft: "auto", fontSize: 11, color: "#a0aec0", fontWeight: 600 }}>
+            {fattureFiltrate.length} de {fatture.length}
+          </div>
+        </div>
+        {/* Barra ricerca */}
+        <div style={{ position: "relative" }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#a0aec0" }}>🔍</span>
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por cliente, descripción, número..."
+            style={{ width: "100%", padding: "8px 12px 8px 30px", border: "1.5px solid #e2e8f0",
+              borderRadius: 8, fontSize: 12, color: "#1a365d", boxSizing: "border-box", outline: "none" }}
+          />
+          {search && (
+            <button onClick={() => setSearch("")}
+              style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+                background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#a0aec0" }}>✕</button>
+          )}
         </div>
       </div>
 

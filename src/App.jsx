@@ -179,12 +179,12 @@ export default function App() {
     return () => clearTimeout(saveTimer.current);
   }, [proy]); // eslint-disable-line
 
-  const handleNewProject     = async () => { const id = await newProyecto(); if (id) { dispatch({ type:"NEW_PROJECT", payload:id }); setTab(1); } };
+  const handleNewProject     = async () => { const id = await newProyecto(); if (id) { dispatch({ type:"NEW_PROJECT", payload:id }); setTab(2); } };
   const handleSaveManual     = () => saveProyecto(proy.currentId, proy, true);
-  const handleOpenProject    = (p) => { loadProject(p); setTab(1); };
-  const handleOpenPDF        = (p) => { loadProject(p); setTab(4); };
+  const handleOpenProject    = (p) => { loadProject(p); setTab(2); };
+  const handleOpenPDF        = (p) => { loadProject(p); setTab(7); };
   const handleDeleteProject  = async (id) => { const d = await deleteProyecto(id); if (d && id===proy.currentId) dispatch({ type:"NEW_PROJECT", payload:null }); };
-  const handleAddFromListino = (item) => { addFromListino(item); setTab(2); };
+  const handleAddFromListino = (item) => { addFromListino(item); setTab(3); };
   const handleInviaFirma     = async () => {
     if (!proy.currentId) { showToast("❌ " + t.errorNoProyecto); return; }
     const result = await creaLinkFirma(proy.currentId, proy.info);
@@ -222,23 +222,26 @@ export default function App() {
   }, []);
 
   const TABS_DEF = useMemo(() => [
-    { icon:"🏠", label: t.dashboard },
-    { icon:"📋", label: t.proyecto },
-    { icon:"🏗️", label: t.costos },
-    { icon:"📊", label: t.resumen },
-    { icon:"🖨️", label: t.vistaCliente },
-    { icon:"💾", label: t.proyectos },
-    { icon:"📦", label: t.listino },
-    { icon:"🏭", label: t.magazzino    || "Bodega" },
-    { icon:"🧾", label: t.fatture      || "Facturas" },
-    { icon:"📈", label: t.storico },
-    { icon:"🔨", label: t.calcolatore  || "Calculadora" },
-    { icon:"📅", label: t.agenda       || "Agenda" },
-    { icon:"🇨🇱", label: t.siiTab      || "SII" },
-    { icon:"⚙️", label: t.impostazioni || "Ajustes" },
-    { icon:"💎", label: "Planes" },
-    { icon:"❓", label: t.tabHelp },
-    { icon:"📦", label: "Kits" },
+    // ── Proyecto (flujo de trabajo) ───────────────────────────────────────────
+    { icon:"🏠", label: t.dashboard                    },  // 0
+    { icon:"💾", label: "Proyectos"                    },  // 1  (lista obras)
+    { icon:"📋", label: "Mi Obra"                      },  // 2  (scheda progetto)
+    { icon:"🏗️", label: t.costos                      },  // 3
+    { icon:"🔨", label: t.calcolatore  || "Calculadora"},  // 4
+    { icon:"🧩", label: "Kits"                         },  // 5
+    { icon:"📊", label: t.resumen                      },  // 6
+    { icon:"🖨️", label: t.vistaCliente                },  // 7
+    // ── Gestión de recursos ───────────────────────────────────────────────────
+    { icon:"📦", label: t.listino                      },  // 8
+    { icon:"🏭", label: t.magazzino    || "Bodega"     },  // 9
+    { icon:"🧾", label: t.fatture      || "Facturas"   },  // 10
+    { icon:"📈", label: t.storico                      },  // 11
+    // ── Operativo ────────────────────────────────────────────────────────────
+    { icon:"📅", label: t.agenda       || "Agenda"     },  // 12
+    { icon:"🇨🇱", label: t.siiTab      || "SII"        },  // 13
+    { icon:"⚙️", label: t.impostazioni || "Ajustes"   },  // 14
+    { icon:"💎", label: "Planes"                       },  // 15
+    { icon:"❓", label: t.tabHelp                      },  // 16
   ], [t]);
 
   // ── Pagina pubblica firma ─────────────────────────────────────────────────
@@ -265,11 +268,11 @@ export default function App() {
 
   // Tab principali nella bottom nav mobile
   const BOTTOM_TABS = [
-    { idx: 0,  icon: "🏠", label: t.dashboard   || "Inicio" },
-    { idx: 1,  icon: "📋", label: t.proyecto     || "Proyecto" },
-    { idx: 2,  icon: "🏗️", label: t.costos       || "Costos" },
-    { idx: 5,  icon: "💾", label: t.proyectos    || "Proyectos" },
-    { idx: -1, icon: "☰",  label: t.mas          || "Más" },
+    { idx: 0,  icon: "🏠", label: "Inicio"     },
+    { idx: 1,  icon: "💾", label: "Proyectos"  },
+    { idx: 2,  icon: "📋", label: "Mi Obra"    },
+    { idx: 3,  icon: "🏗️", label: t.costos || "Costos" },
+    { idx: -1, icon: "☰",  label: t.mas    || "Más"    },
   ];
 
   return (
@@ -505,22 +508,22 @@ export default function App() {
         <Suspense fallback={<TabLoader />}>
           <ErrorBoundary label={TABS_DEF[tab]?.label}>
             {tab===0  && <TabDashboard proyectos={proyectos} partidas={proy.partidas} cats={cats} t={t} onOpenProject={handleOpenProject} onNewProject={handleNewProject} />}
-            {tab===1  && <TabProyecto info={proy.info} setInfo={setInfo} pct={proy.pct} setPct={setPct} estado={proy.estado} setEstado={setEstado} iva={proy.iva} setIva={setIva} validez={proy.validez} setValidez={setValidez} condPago={proy.condPago} setCondPago={setCondPago} condPagoPersonalizado={proy.condPagoPersonalizado} setCondPagoPersonalizado={setCondPagoPersonalizado} cuotas={proy.cuotas} setCuotas={setCuotas} partidas={proy.partidas} t={t} />}
-            {tab===2  && <TabCostos partidas={proy.partidas} cats={cats} addPartida={addPartida} updP={updP} delP={delP} addFromListino={handleAddFromListino} listino={listino} t={t} workspaceId={workspace?.id} lang={lang} />}
-            {tab===3  && <TabResumen partidas={proy.partidas} pct={proy.pct} cats={cats} iva={proy.iva} t={t} />}
-            {tab===4  && <TabVistaCliente info={proy.info} partidas={proy.partidas} pct={proy.pct} cats={cats} catVis={proy.catVis} getCatVis={getCatVis} setCatVisKey={setCatVisKey} iva={proy.iva} estado={proy.estado} currentId={proy.currentId} validez={proy.validez} t={t} onInviaFirma={handleInviaFirma} firme={firme} plan={workspace?.plan} />}
-            {tab===5  && <TabProyectos proyectos={proyectos} currentId={proy.currentId} onLoad={handleOpenProject} onDelete={handleDeleteProject} onPDF={handleOpenPDF} t={t} />}
-            {tab===6  && <TabListino listino={listino} cats={cats} catColors={CAT_COLORS} newCatName={newCatName} setNewCatName={setNewCatName} onAddCat={() => { addCat(newCatName,t); setNewCatName(""); }} onDeleteItem={deleteListinoItem} onAddFromListino={handleAddFromListino} onOpenAddModal={() => setShowAddListino(true)} DEFAULT_CATS={DEFAULT_CATS} t={t} />}
-            {tab===7  && <TabMagazzino items={magItems} movimenti={movimenti} itemsInAlert={itemsInAlert} loading={magLoading} cats={cats} proyectos={proyectos} onSaveItem={saveMagItem} onDeleteItem={deleteMagItem} onMovimento={registraMovimento} />}
-            {tab===8  && <TabFatture proyectos={proyectos} fatture={fatture} onCreaFattura={creaFattura} onTogglePagata={togglePagata} onEliminaFattura={eliminaFattura} />}
-            {tab===9  && <TabStorico proyectos={proyectos} t={t} />}
-            {tab===10 && <TabCalcolatore listino={listino} addPartida={addPartida} cats={cats} onToast={showToast} />}
-            {tab===11 && <TabAgenda proyectos={proyectos} fatture={fatture} onOpenProject={handleOpenProject} />}
-            {tab===12 && <TabSII proyectos={proyectos} workspaceId={workspace?.id} t={t} onToast={showToast} />}
-            {tab===13 && <TabSettings workspace={workspace} members={members} myRole={myRole} can={can} onInvite={(email,role) => inviteMember(email,role,workspace.id)} onChangeRole={changeMemberRole} onRemoveMember={removeMember} onUpdateName={updateWorkspaceName} onGoToPiani={() => setTab(15)} />}
-            {tab===14 && <TabHelp t={t} />}
+            {tab===1  && <TabProyectos proyectos={proyectos} currentId={proy.currentId} onLoad={handleOpenProject} onDelete={handleDeleteProject} onPDF={handleOpenPDF} t={t} />}
+            {tab===2  && <TabProyecto info={proy.info} setInfo={setInfo} pct={proy.pct} setPct={setPct} estado={proy.estado} setEstado={setEstado} iva={proy.iva} setIva={setIva} validez={proy.validez} setValidez={setValidez} condPago={proy.condPago} setCondPago={setCondPago} condPagoPersonalizado={proy.condPagoPersonalizado} setCondPagoPersonalizado={setCondPagoPersonalizado} cuotas={proy.cuotas} setCuotas={setCuotas} partidas={proy.partidas} t={t} />}
+            {tab===3  && <TabCostos partidas={proy.partidas} cats={cats} addPartida={addPartida} updP={updP} delP={delP} addFromListino={handleAddFromListino} listino={listino} t={t} workspaceId={workspace?.id} lang={lang} />}
+            {tab===4  && <TabCalcolatore listino={listino} addPartida={addPartida} cats={cats} onToast={showToast} />}
+            {tab===5  && <TabKitMateriali kits={kits} cargando={cargandoKits} onSaveKit={saveKit} onDeleteKit={deleteKit} onImportarPredefinito={importarKitPredefinito} addPartida={addPartida} cats={cats} onToast={showToast} />}
+            {tab===6  && <TabResumen partidas={proy.partidas} pct={proy.pct} cats={cats} iva={proy.iva} t={t} />}
+            {tab===7  && <TabVistaCliente info={proy.info} partidas={proy.partidas} pct={proy.pct} cats={cats} catVis={proy.catVis} getCatVis={getCatVis} setCatVisKey={setCatVisKey} iva={proy.iva} estado={proy.estado} currentId={proy.currentId} validez={proy.validez} t={t} onInviaFirma={handleInviaFirma} firme={firme} plan={workspace?.plan} />}
+            {tab===8  && <TabListino listino={listino} cats={cats} catColors={CAT_COLORS} newCatName={newCatName} setNewCatName={setNewCatName} onAddCat={() => { addCat(newCatName,t); setNewCatName(""); }} onDeleteItem={deleteListinoItem} onAddFromListino={handleAddFromListino} onOpenAddModal={() => setShowAddListino(true)} DEFAULT_CATS={DEFAULT_CATS} t={t} />}
+            {tab===9  && <TabMagazzino items={magItems} movimenti={movimenti} itemsInAlert={itemsInAlert} loading={magLoading} cats={cats} proyectos={proyectos} onSaveItem={saveMagItem} onDeleteItem={deleteMagItem} onMovimento={registraMovimento} />}
+            {tab===10 && <TabFatture proyectos={proyectos} fatture={fatture} onCreaFattura={creaFattura} onTogglePagata={togglePagata} onEliminaFattura={eliminaFattura} />}
+            {tab===11 && <TabStorico proyectos={proyectos} t={t} />}
+            {tab===12 && <TabAgenda proyectos={proyectos} fatture={fatture} onOpenProject={handleOpenProject} />}
+            {tab===13 && <TabSII proyectos={proyectos} workspaceId={workspace?.id} t={t} onToast={showToast} />}
+            {tab===14 && <TabSettings workspace={workspace} members={members} myRole={myRole} can={can} onInvite={(email,role) => inviteMember(email,role,workspace.id)} onChangeRole={changeMemberRole} onRemoveMember={removeMember} onUpdateName={updateWorkspaceName} onGoToPiani={() => setTab(15)} />}
             {tab===15 && <TabPiani workspace={workspace} />}
-            {tab===16 && <TabKitMateriali kits={kits} cargando={cargandoKits} onSaveKit={saveKit} onDeleteKit={deleteKit} onImportarPredefinito={importarKitPredefinito} addPartida={addPartida} cats={cats} onToast={showToast} />}
+            {tab===16 && <TabHelp t={t} />}
           </ErrorBoundary>
         </Suspense>
       </main>
