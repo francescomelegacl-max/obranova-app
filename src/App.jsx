@@ -9,7 +9,7 @@ import { useMagazzino }                     from "./hooks/useMagazzino";
 import { useFirma }                         from "./hooks/useFirma";
 import { useFatture }                       from "./hooks/useFatture";
 import { TabFatture }                       from "./components/tabs/TabFatture";
-import TabMercado                           from "./components/tabs/TabMercado";
+// import TabMercado                           from "./components/tabs/TabMercado";
 import PaginaFirma                          from "./components/FirmaPage";
 import T                                    from "./i18n/translations";
 import { calcTotals, exportCSV }            from "./utils/helpers";
@@ -252,7 +252,7 @@ export default function App() {
     { icon: "🏭", label: "Magazzino" },
     { icon: "🧾", label: "Fatture" },
     { icon: "📈", label: t.storico },
-    { icon: "🛒", label: "MercadoLibre" },
+    // { icon: "🛒", label: "MercadoLibre" }, // temporaneamente nascosto
     { icon: "⚙️", label: "Impostazioni" },
     { icon: "❓", label: t.tabHelp },
   ], [t]);
@@ -364,7 +364,7 @@ export default function App() {
         {tab===7 && <TabMagazzino items={magItems} movimenti={movimenti} itemsInAlert={itemsInAlert} loading={magLoading} cats={cats} proyectos={proyectos} onSaveItem={saveMagItem} onDeleteItem={deleteMagItem} onMovimento={registraMovimento} />}
         {tab===8 && <TabFatture proyectos={proyectos} fatture={fatture} onCreaFattura={creaFattura} onTogglePagata={togglePagata} onEliminaFattura={eliminaFattura} />}
         {tab===9 && <TabStorico proyectos={proyectos} t={t} />}
-        {tab===10 && <TabMercado workspaceId={workspace?.id} lang={lang} onToast={showToast} />}
+        {/* tab===10 && <TabMercado workspaceId={workspace?.id} lang={lang} onToast={showToast} /> */}
         {tab===11 && <TabSettings workspace={workspace} members={members} myRole={myRole} can={can} onInvite={(email,role) => inviteMember(email,role,workspace.id)} onChangeRole={changeMemberRole} onRemoveMember={removeMember} onUpdateName={updateWorkspaceName} />}
         {tab===12 && <TabHelp t={t} />}
       </main>
