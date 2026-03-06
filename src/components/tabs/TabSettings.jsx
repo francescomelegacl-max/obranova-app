@@ -101,7 +101,7 @@ function PDFSettingsSection({ plan = "free", onGoToPiani }) {
       {/* Colori */}
       <div style={{ marginBottom:16 }}>
         <div style={{ fontSize:12,fontWeight:700,color:"#4a5568",marginBottom:8 }}>Colores</div>
-        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:10 }}>
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10 }}>
           {[
             { key:"colorPrimario", label:"Encabezado / tablas", icon:"🎨" },
             { key:"colorAccento",  label:"Totales / énfasis",   icon:"✨" },
@@ -245,7 +245,7 @@ export default function TabSettings({
           <div style={{ fontWeight:700,fontSize:14,color:"#1a365d",marginBottom:14,borderBottom:"2px solid #ebf8ff",paddingBottom:7 }}>
             ✉️ Invitar Colaborador
           </div>
-          <div style={{ display:"grid",gridTemplateColumns:"1fr auto auto",gap:10,alignItems:"center" }}>
+          <div style={{ display:"flex",flexDirection:"column",gap:10 }}>
             <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
               onKeyDown={e => e.key==="Enter" && handleInvite()}
               placeholder="email@colaborador.com" type="email"

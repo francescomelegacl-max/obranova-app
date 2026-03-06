@@ -193,15 +193,15 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
         ))}
       </div>
 
-      {/* Dashboard Finanziaria */}
+      {/* Panel Financiero */}
       <div style={{ background: "linear-gradient(135deg,#1a365d,#2d3748)", borderRadius: 12, padding: "18px 20px", color: "white" }}>
-        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>📊 Dashboard Financiero</div>
+        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>📊 Panel Financiero</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12 }}>
           {[
-            { label: "Facturación aceptada",   value: fmt(dashStats.facturacion), icon: "💰", color: "#68d391" },
-            { label: "Costo real total", value: fmt(dashStats.costoReal),   icon: "🔧", color: "#fc8181" },
-            { label: "Margen neto",      value: fmt(dashStats.margine),     icon: "📈", color: dashStats.margine >= 0 ? "#68d391" : "#fc8181" },
-            { label: "Margen %",          value: dashStats.margineP + "%",   icon: "🎯", color: dashStats.margineP >= 10 ? "#68d391" : "#fef08a" },
+            { label: "Facturación aceptada", value: fmt(dashStats.facturacion), icon: "💰", color: "#68d391" },
+            { label: "Costo real",           value: fmt(dashStats.costoReal),   icon: "🔧", color: "#fc8181" },
+            { label: "Margen",               value: fmt(dashStats.margine),     icon: "📈", color: dashStats.margine >= 0 ? "#68d391" : "#fc8181" },
+            { label: "Margen %",             value: dashStats.margineP + "%",   icon: "🎯", color: dashStats.margineP >= 10 ? "#68d391" : "#fef08a" },
           ].map(({ label, value, icon, color }) => (
             <div key={label} style={{ background: "rgba(255,255,255,.1)", borderRadius: 10, padding: "12px 14px" }}>
               <div style={{ fontSize: 18 }}>{icon}</div>
