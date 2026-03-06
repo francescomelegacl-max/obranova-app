@@ -113,9 +113,9 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
       .slice(-8)
       .map(([mese, vals]) => ({
         mes: mese.slice(5) + "/" + mese.slice(2, 4),
-        Preventivato: Math.round(vals.prev),
-        "Costo reale": Math.round(vals.real),
-        Margine: Math.round(vals.prev - vals.real),
+        Presupuestado: Math.round(vals.prev),
+        "Costo real": Math.round(vals.real),
+        Margen: Math.round(vals.prev - vals.real),
       }));
   }, [proyectos]);
 
@@ -195,13 +195,13 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
 
       {/* Dashboard Finanziaria */}
       <div style={{ background: "linear-gradient(135deg,#1a365d,#2d3748)", borderRadius: 12, padding: "18px 20px", color: "white" }}>
-        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>📊 Dashboard Finanziaria</div>
+        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>📊 Dashboard Financiero</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12 }}>
           {[
-            { label: "Fatturato totale",   value: fmt(dashStats.facturacion), icon: "💰", color: "#68d391" },
-            { label: "Costo reale totale", value: fmt(dashStats.costoReal),   icon: "🔧", color: "#fc8181" },
-            { label: "Margine netto",      value: fmt(dashStats.margine),     icon: "📈", color: dashStats.margine >= 0 ? "#68d391" : "#fc8181" },
-            { label: "Margine %",          value: dashStats.margineP + "%",   icon: "🎯", color: dashStats.margineP >= 10 ? "#68d391" : "#fef08a" },
+            { label: "Facturación aceptada",   value: fmt(dashStats.facturacion), icon: "💰", color: "#68d391" },
+            { label: "Costo real total", value: fmt(dashStats.costoReal),   icon: "🔧", color: "#fc8181" },
+            { label: "Margen neto",      value: fmt(dashStats.margine),     icon: "📈", color: dashStats.margine >= 0 ? "#68d391" : "#fc8181" },
+            { label: "Margen %",          value: dashStats.margineP + "%",   icon: "🎯", color: dashStats.margineP >= 10 ? "#68d391" : "#fef08a" },
           ].map(({ label, value, icon, color }) => (
             <div key={label} style={{ background: "rgba(255,255,255,.1)", borderRadius: 10, padding: "12px 14px" }}>
               <div style={{ fontSize: 18 }}>{icon}</div>
@@ -218,11 +218,11 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
         {/* Revenue mensile — LineChart + BarChart */}
         <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)", gridColumn: "1 / -1" }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 16 }}>
-            📅 Revenue mensile — Preventivato vs Costo reale
+            📅 Ingresos mensuales — Presupuestado vs Costo real
           </div>
           {revenueData.length === 0 ? (
             <div style={{ textAlign: "center", color: "#a0aec0", padding: "30px 0", fontSize: 13 }}>
-              Nessun progetto accettato con data
+              Sin proyectos aceptados con fecha
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
@@ -233,9 +233,9 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
                   tickFormatter={v => v >= 1000000 ? (v / 1000000).toFixed(1) + "M" : v >= 1000 ? (v / 1000).toFixed(0) + "k" : v} />
                 <Tooltip content={<RevenueTooltip />} cursor={{ fill: "rgba(26,54,93,.04)" }} />
                 <Legend wrapperStyle={{ fontSize: 11, color: "#718096", paddingTop: 8 }} />
-                <Bar dataKey="Preventivato" fill="#805ad5" radius={[5, 5, 0, 0]} maxBarSize={36} />
-                <Bar dataKey="Costo reale"  fill="#68d391" radius={[5, 5, 0, 0]} maxBarSize={36} />
-                <Bar dataKey="Margine"      fill="#63b3ed" radius={[5, 5, 0, 0]} maxBarSize={36} />
+                <Bar dataKey="Presupuestado" fill="#805ad5" radius={[5, 5, 0, 0]} maxBarSize={36} />
+                <Bar dataKey="Costo real"  fill="#68d391" radius={[5, 5, 0, 0]} maxBarSize={36} />
+                <Bar dataKey="Margen"      fill="#63b3ed" radius={[5, 5, 0, 0]} maxBarSize={36} />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -246,7 +246,7 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
           <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 4 }}>
             🥧 Proyectos por estado
           </div>
-          <div style={{ fontSize: 11, color: "#a0aec0", marginBottom: 12 }}>Clicca una fetta per dettagli</div>
+          <div style={{ fontSize: 11, color: "#a0aec0", marginBottom: 12 }}>Haz clic en un sector para ver detalles</div>
           {pieData.length === 0 ? (
             <div style={{ textAlign: "center", color: "#a0aec0", padding: "30px 0", fontSize: 13 }}>Sin proyectos</div>
           ) : (
@@ -324,9 +324,9 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
 
         {/* Budget vs Reale per progetto */}
         <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 14 }}>⚖️ Budget vs Reale per progetto</div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 14 }}>⚖️ Presupuesto vs Real por proyecto</div>
           {proyBudgetReal.length === 0
-            ? <div style={{ textAlign: "center", color: "#a0aec0", padding: "25px 0", fontSize: 12 }}>Nessun progetto accettato</div>
+            ? <div style={{ textAlign: "center", color: "#a0aec0", padding: "25px 0", fontSize: 12 }}>Sin proyectos aceptados</div>
             : proyBudgetReal.map(p => (
               <div key={p.id} style={{ marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
@@ -339,9 +339,9 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
                     {p.diff >= 0 ? "+" : ""}{p.diff}%
                   </span>
                 </div>
-                <div style={{ fontSize: 9, color: "#718096", marginBottom: 2 }}>Prev. {fmt(p.prev)}</div>
+                <div style={{ fontSize: 9, color: "#718096", marginBottom: 2 }}>Presup. {fmt(p.prev)}</div>
                 <MiniBar value={p.prev} max={Math.max(p.prev, p.real) * 1.1} color="#805ad5" />
-                <div style={{ fontSize: 9, color: "#718096", margin: "4px 0 2px" }}>Reale {fmt(p.real)}</div>
+                <div style={{ fontSize: 9, color: "#718096", margin: "4px 0 2px" }}>Real {fmt(p.real)}</div>
                 <MiniBar value={p.real} max={Math.max(p.prev, p.real) * 1.1} color={p.real <= p.prev ? "#68d391" : "#fc8181"} />
               </div>
             ))

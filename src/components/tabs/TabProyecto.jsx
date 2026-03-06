@@ -18,6 +18,9 @@ export default function TabProyecto({
 }) {
   const [showTemplates,   setShowTemplates]   = useState(false);
   const [templateApplied, setTemplateApplied] = useState("");
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useState(() => { const fn = () => setIsMobile(window.innerWidth < 768); window.addEventListener("resize", fn); return () => window.removeEventListener("resize", fn); }, []);
   const venceDate = info.fecha
     ? new Date(new Date(info.fecha).getTime() + validez * 86400000).toLocaleDateString("es-CL")
     : "—";
@@ -80,7 +83,7 @@ export default function TabProyecto({
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit,minmax(280px,1fr))", gap: 14 }}>
 
       {/* Datos del cliente */}
       <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
@@ -124,7 +127,7 @@ export default function TabProyecto({
               <input value={info[f.k] || ""} onChange={e => setInfo({ [f.k]: e.target.value })} style={inputStyle} />
             </div>
           ))}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 8 }}>
             {[
               { k: "fecha",         l: t.fecha,       tip: t.tooltipFecha },
               { k: "fechaInicio",   l: t.fechaInicio },
@@ -257,7 +260,7 @@ export default function TabProyecto({
         {condPago === "cuotas" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {cuotas.map((c, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 6, alignItems: "center" }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr auto", gap: 6, alignItems: "center" }}>
                 <input
                   value={c.desc}
                   onChange={e => { const nc = [...cuotas]; nc[i] = { ...nc[i], desc: e.target.value }; setCuotas(nc); }}
