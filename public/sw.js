@@ -1,10 +1,15 @@
+// Service Worker disabilitato
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.map(k => caches.delete(k))))
-      .then(() => self.clients.matchAll({ type: 'window' }))
-      .then(clients => clients.forEach(c => c.navigate(c.url)))
+    caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+      .then(() => self.registration.unregister())
   );
-  self.clients.claim();
 });
+```
+
+Salva (`Ctrl+S`), poi in CMD:
+```
+git add .
+git commit -m "fix: sw.js unregister definitivo"
+git push
