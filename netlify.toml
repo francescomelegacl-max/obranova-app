@@ -2,5 +2,5 @@
   command = "npm run build"
   publish = "dist"
 
-[build.environment]
-  SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES = "VITE_FIREBASE_API_KEY"
+[context.production.environment]
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
