@@ -1,4 +1,30 @@
 // netlify/functions/ml-search.js
+let cachedToken = null;
+let tokenExpiry  = 0;
+
+async function getAccessToken() {
+  if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+
+  const res = await fetch("https://api.mercadolibre.com/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type:    "client_credentials",
+      client_id:     process.env.ML_CLIENT_ID,
+      client_secret: process.env.ML_CLIENT_SECRET,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Token error ${res.status}: ${err}`);
+  }
+  const data = await res.json();
+  cachedToken = data.access_token;
+  tokenExpiry  = Date.now() + (data.expires_in - 60) * 1000;
+  return cachedToken;
+}
+
 export const handler = async (event) => {
   const headers = {
     "Access-Control-Allow-Origin":  "*",
@@ -13,16 +39,22 @@ export const handler = async (event) => {
   if (!q) return { statusCode: 400, headers, body: JSON.stringify({ error: "Parametro q richiesto" }) };
 
   try {
-    let url = `https://api.mercadolibre.com/sites/${site}/search?q=${encodeURIComponent(q)}&limit=${limit}&condition=new`;
+    const token = await getAccessToken();
+    let url = `https://api.mercadolibre.com/sites/${site}/search?q=${encodeURIComponent(q)}&limit=${limit}`;
     if (categoria) url += `&category=${categoria}`;
 
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Authorization": `Bearer ${token}`,
+        "User-Agent": "Mozilla/5.0",
         "Accept": "application/json",
       }
     });
-    if (!res.ok) throw new Error(`ML search error ${res.status}`);
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`ML search error ${res.status}: ${errBody}`);
+    }
     const data = await res.json();
 
     return {
