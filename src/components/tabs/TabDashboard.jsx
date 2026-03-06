@@ -1,11 +1,14 @@
 // ─── components/tabs/TabDashboard.jsx ───────────────────────────────────────
-import { useMemo } from "react";
-import { BarChart, PieChart } from "../UI";
+import { useMemo, useState } from "react";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid,
+} from "recharts";
 import { fmt } from "../../utils/helpers";
 import { ESTADO_COLORS, ESTADO_BG, CAT_COLORS } from "../../utils/constants";
 import { calcProjectTotal, calcProjectCostoReal } from "../../utils/helpers";
 
-// Mini progress bar inline
+// ── Mini progress bar ────────────────────────────────────────────────────────
 function MiniBar({ value, max, color }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
@@ -15,8 +18,62 @@ function MiniBar({ value, max, color }) {
   );
 }
 
+// ── Tooltip revenue personalizzato ──────────────────────────────────────────
+function RevenueTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{
+      background: "#1a365d", borderRadius: 10, padding: "10px 14px",
+      boxShadow: "0 8px 24px rgba(0,0,0,.25)", border: "1px solid rgba(255,255,255,.1)",
+    }}>
+      <div style={{ color: "rgba(255,255,255,.7)", fontSize: 11, marginBottom: 6 }}>{label}</div>
+      {payload.map(p => (
+        <div key={p.name} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 3 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.color }} />
+          <span style={{ color: "white", fontSize: 12, fontWeight: 700 }}>{fmt(p.value)}</span>
+          <span style={{ color: "rgba(255,255,255,.5)", fontSize: 10 }}>{p.name}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Tooltip pie personalizzato ───────────────────────────────────────────────
+function PieTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0];
+  return (
+    <div style={{
+      background: "white", borderRadius: 10, padding: "9px 13px",
+      boxShadow: "0 6px 20px rgba(0,0,0,.15)", border: `2px solid ${d.payload.color}`,
+    }}>
+      <div style={{ fontWeight: 800, fontSize: 13, color: "#1a365d" }}>{d.name}</div>
+      <div style={{ fontSize: 12, color: d.payload.color, fontWeight: 700 }}>{d.value} proyectos</div>
+      <div style={{ fontSize: 11, color: "#718096" }}>{d.payload.pct}% del total</div>
+    </div>
+  );
+}
+
+// ── Label personalizzata per pie ─────────────────────────────────────────────
+function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, value, name }) {
+  if (value === 0) return null;
+  const RADIAN = Math.PI / 180;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central"
+      style={{ fontSize: 13, fontWeight: 800 }}>
+      {value}
+    </text>
+  );
+}
+
 export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProject, onNewProject }) {
 
+  const [activeSlice, setActiveSlice] = useState(null);
+
+  // ── Stats base ────────────────────────────────────────────────────────────
   const dashStats = useMemo(() => {
     const accepted = proyectos.filter(p => p.estado === "Aceptado");
     const sent     = proyectos.filter(p => p.estado === "Enviado");
@@ -28,6 +85,7 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
       enviados:    sent.length,
       borradores:  proyectos.filter(p => p.estado === "Borrador").length,
       rechazados:  proyectos.filter(p => p.estado === "Rechazado").length,
+      activos:     proyectos.filter(p => p.estado === "Activo").length,
       facturacion: totalPrev,
       pendiente:   sent.reduce((s, p) => s + calcProjectTotal(p), 0),
       costoReal:   totalReal,
@@ -37,9 +95,54 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
   }, [proyectos]);
 
   const convRate = dashStats.total > 0
-    ? Math.round(dashStats.aceptados / dashStats.total * 100)
-    : 0;
+    ? Math.round(dashStats.aceptados / dashStats.total * 100) : 0;
 
+  // ── Revenue mensile (recharts) ────────────────────────────────────────────
+  const revenueData = useMemo(() => {
+    const mappa = {};
+    proyectos
+      .filter(p => p.estado === "Aceptado" && p.updatedAt)
+      .forEach(p => {
+        const mese = p.updatedAt.slice(0, 7);
+        if (!mappa[mese]) mappa[mese] = { prev: 0, real: 0 };
+        mappa[mese].prev += calcProjectTotal(p);
+        mappa[mese].real += calcProjectCostoReal(p);
+      });
+    return Object.entries(mappa)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-8)
+      .map(([mese, vals]) => ({
+        mes: mese.slice(5) + "/" + mese.slice(2, 4),
+        Preventivato: Math.round(vals.prev),
+        "Costo reale": Math.round(vals.real),
+        Margine: Math.round(vals.prev - vals.real),
+      }));
+  }, [proyectos]);
+
+  // ── Pie chart stati ───────────────────────────────────────────────────────
+  const STATI_CONFIG = [
+    { key: "Aceptado",  color: "#48bb78", label: t.aceptados  || "Aceptado" },
+    { key: "Enviado",   color: "#63b3ed", label: t.enviados   || "Enviado" },
+    { key: "Borrador",  color: "#cbd5e0", label: t.borradores || "Borrador" },
+    { key: "Rechazado", color: "#fc8181", label: t.rechazados || "Rechazado" },
+    { key: "Activo",    color: "#f6ad55", label: t.activo     || "Activo" },
+    { key: "Pausado",   color: "#b794f4", label: t.pausado    || "Pausado" },
+    { key: "Finalizado",color: "#68d391", label: t.finalizado || "Finalizado" },
+  ];
+
+  const pieData = useMemo(() => {
+    const total = proyectos.length || 1;
+    return STATI_CONFIG
+      .map(s => ({
+        name:  s.label,
+        value: proyectos.filter(p => p.estado === s.key).length,
+        color: s.color,
+        pct:   Math.round(proyectos.filter(p => p.estado === s.key).length / total * 100),
+      }))
+      .filter(d => d.value > 0);
+  }, [proyectos]);
+
+  // ── Top clientes ──────────────────────────────────────────────────────────
   const topClientes = useMemo(() => Object.values(
     proyectos
       .filter(p => p.estado === "Aceptado")
@@ -51,55 +154,11 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
       }, {})
   ).sort((a, b) => b.total - a.total).slice(0, 4), [proyectos, t]);
 
-  const barData = [
-    { label: t.aceptados,  value: dashStats.aceptados,  color: "#68d391" },
-    { label: t.enviados,   value: dashStats.enviados,   color: "#63b3ed" },
-    { label: t.borradores, value: dashStats.borradores, color: "#cbd5e0" },
-    { label: t.rechazados, value: dashStats.rechazados, color: "#fc8181" },
-  ];
-
-  const pieData = useMemo(() => cats
-    .map((cat, i) => ({
-      label: cat,
-      color: CAT_COLORS[i % CAT_COLORS.length],
-      value: partidas.filter(p => p.cat === cat).reduce((s, p) => s + p.cant * p.pu, 0),
-    }))
-    .filter(d => d.value > 0), [cats, partidas]);
-
-  const kpis = [
-    { label: t.totalProy || "Total proyectos", value: dashStats.total,              icon: "📁", color: "#2b6cb0", bg: "#ebf8ff" },
-    { label: t.aceptados,                       value: dashStats.aceptados,          icon: "✅", color: "#276749", bg: "#f0fff4" },
-    { label: t.tasaConv,                         value: convRate + "%",              icon: "📈", color: "#c05621", bg: "#fffaf0" },
-    { label: t.facturacion,                      value: fmt(dashStats.facturacion), icon: "💰", color: "#553c9a", bg: "#faf5ff" },
-    { label: t.pendiente,                        value: fmt(dashStats.pendiente),   icon: "⏳", color: "#b7791f", bg: "#fffff0" },
-  ];
-
-  // Cashflow mensile: raggruppa i progetti accettati per mese di aggiornamento
-  const cashflowMesi = useMemo(() => {
-    const mappa = {};
-    proyectos
-      .filter(p => p.estado === "Aceptado" && p.updatedAt)
-      .forEach(p => {
-        const mese = p.updatedAt.slice(0, 7); // "2026-03"
-        if (!mappa[mese]) mappa[mese] = { prev: 0, real: 0 };
-        mappa[mese].prev += calcProjectTotal(p);
-        mappa[mese].real += calcProjectCostoReal(p);
-      });
-    return Object.entries(mappa)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-6)
-      .map(([mese, vals]) => ({ mese: mese.slice(5) + "/" + mese.slice(2, 4), ...vals }));
-  }, [proyectos]);
-
-  const maxCashflow = useMemo(() =>
-    Math.max(...cashflowMesi.flatMap(m => [m.prev, m.real]), 1)
-  , [cashflowMesi]);
-
-  // Budget vs Reale per progetti recenti
+  // ── Budget vs Reale ───────────────────────────────────────────────────────
   const proyBudgetReal = useMemo(() =>
     proyectos
       .filter(p => p.estado === "Aceptado")
-      .slice(0, 6)
+      .slice(0, 5)
       .map(p => {
         const prev = calcProjectTotal(p);
         const real = calcProjectCostoReal(p);
@@ -107,6 +166,15 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
         return { id: p.id, cliente: p.info?.cliente || "—", prev, real, diff };
       })
   , [proyectos]);
+
+  // ── KPI ───────────────────────────────────────────────────────────────────
+  const kpis = [
+    { label: t.totalProy || "Total proyectos", value: dashStats.total,              icon: "📁", color: "#2b6cb0", bg: "#ebf8ff" },
+    { label: t.aceptados || "Aceptados",        value: dashStats.aceptados,          icon: "✅", color: "#276749", bg: "#f0fff4" },
+    { label: t.tasaConv  || "Tasa conv.",        value: convRate + "%",              icon: "📈", color: "#c05621", bg: "#fffaf0" },
+    { label: t.facturacion || "Facturación",     value: fmt(dashStats.facturacion), icon: "💰", color: "#553c9a", bg: "#faf5ff" },
+    { label: t.pendiente || "Pendiente",         value: fmt(dashStats.pendiente),   icon: "⏳", color: "#b7791f", bg: "#fffff0" },
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -125,7 +193,7 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
         ))}
       </div>
 
-      {/* ── SEZIONE FINANZIARIA ───────────────────────────────────────────── */}
+      {/* Dashboard Finanziaria */}
       <div style={{ background: "linear-gradient(135deg,#1a365d,#2d3748)", borderRadius: 12, padding: "18px 20px", color: "white" }}>
         <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>📊 Dashboard Finanziaria</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12 }}>
@@ -144,35 +212,114 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
         </div>
       </div>
 
-      {/* Charts + Lists */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 14 }}>
+      {/* ── GRAFICI RECHARTS ────────────────────────────────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))", gap: 14 }}>
 
-        {/* Cashflow mensile */}
-        <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 14 }}>📅 Cashflow ultimi 6 mesi</div>
-          {cashflowMesi.length === 0
-            ? <div style={{ textAlign: "center", color: "#a0aec0", padding: "25px 0", fontSize: 12 }}>Nessun progetto accettato</div>
-            : cashflowMesi.map(m => (
-              <div key={m.mese} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#2d3748" }}>{m.mese}</span>
-                  <span style={{ fontSize: 10, color: "#718096" }}>{fmt(m.prev)}</span>
-                </div>
-                <div style={{ display: "flex", gap: 3, alignItems: "center", marginBottom: 2 }}>
-                  <span style={{ fontSize: 9, color: "#553c9a", width: 48 }}>Prev.</span>
-                  <MiniBar value={m.prev} max={maxCashflow} color="#805ad5" />
-                </div>
-                <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
-                  <span style={{ fontSize: 9, color: "#c53030", width: 48 }}>Reale</span>
-                  <MiniBar value={m.real} max={maxCashflow} color={m.real <= m.prev ? "#68d391" : "#fc8181"} />
-                </div>
-              </div>
-            ))
-          }
-          <div style={{ display: "flex", gap: 12, marginTop: 10, fontSize: 10, color: "#718096" }}>
-            <span><span style={{ color: "#805ad5" }}>■</span> Preventivato</span>
-            <span><span style={{ color: "#48bb78" }}>■</span> Costo reale</span>
+        {/* Revenue mensile — LineChart + BarChart */}
+        <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)", gridColumn: "1 / -1" }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 16 }}>
+            📅 Revenue mensile — Preventivato vs Costo reale
           </div>
+          {revenueData.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#a0aec0", padding: "30px 0", fontSize: 13 }}>
+              Nessun progetto accettato con data
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={revenueData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f4f8" vertical={false} />
+                <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#718096" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#a0aec0" }} axisLine={false} tickLine={false}
+                  tickFormatter={v => v >= 1000000 ? (v / 1000000).toFixed(1) + "M" : v >= 1000 ? (v / 1000).toFixed(0) + "k" : v} />
+                <Tooltip content={<RevenueTooltip />} cursor={{ fill: "rgba(26,54,93,.04)" }} />
+                <Legend wrapperStyle={{ fontSize: 11, color: "#718096", paddingTop: 8 }} />
+                <Bar dataKey="Preventivato" fill="#805ad5" radius={[5, 5, 0, 0]} maxBarSize={36} />
+                <Bar dataKey="Costo reale"  fill="#68d391" radius={[5, 5, 0, 0]} maxBarSize={36} />
+                <Bar dataKey="Margine"      fill="#63b3ed" radius={[5, 5, 0, 0]} maxBarSize={36} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Pie chart stati — interattivo */}
+        <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 4 }}>
+            🥧 Proyectos por estado
+          </div>
+          <div style={{ fontSize: 11, color: "#a0aec0", marginBottom: 12 }}>Clicca una fetta per dettagli</div>
+          {pieData.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#a0aec0", padding: "30px 0", fontSize: 13 }}>Sin proyectos</div>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%" cy="50%"
+                    innerRadius={50} outerRadius={85}
+                    paddingAngle={3}
+                    dataKey="value"
+                    labelLine={false}
+                    label={<PieLabel />}
+                    onMouseEnter={(_, i) => setActiveSlice(i)}
+                    onMouseLeave={() => setActiveSlice(null)}
+                    onClick={(d) => setActiveSlice(activeSlice === pieData.indexOf(d) ? null : pieData.indexOf(d))}
+                  >
+                    {pieData.map((entry, i) => (
+                      <Cell
+                        key={entry.name}
+                        fill={entry.color}
+                        opacity={activeSlice === null || activeSlice === i ? 1 : 0.45}
+                        stroke={activeSlice === i ? "white" : "none"}
+                        strokeWidth={activeSlice === i ? 3 : 0}
+                        style={{ cursor: "pointer", transition: "opacity .2s" }}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<PieTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+
+              {/* Legenda custom */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                {pieData.map((d, i) => (
+                  <div
+                    key={d.name}
+                    onClick={() => setActiveSlice(activeSlice === i ? null : i)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      padding: "4px 10px", borderRadius: 99, cursor: "pointer",
+                      background: activeSlice === i ? d.color + "22" : "#f7fafc",
+                      border: `1.5px solid ${activeSlice === i ? d.color : "#e2e8f0"}`,
+                      transition: "all .15s",
+                    }}
+                  >
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: d.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, fontWeight: 600, color: activeSlice === i ? d.color : "#4a5568" }}>
+                      {d.name}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: d.color }}>{d.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Dettaglio slice attiva */}
+              {activeSlice !== null && pieData[activeSlice] && (
+                <div style={{
+                  marginTop: 12, padding: "10px 14px",
+                  background: pieData[activeSlice].color + "18",
+                  borderRadius: 10, border: `1.5px solid ${pieData[activeSlice].color}44`,
+                }}>
+                  <div style={{ fontWeight: 800, fontSize: 13, color: pieData[activeSlice].color }}>
+                    {pieData[activeSlice].name}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#4a5568", marginTop: 3 }}>
+                    <strong>{pieData[activeSlice].value}</strong> proyectos · <strong>{pieData[activeSlice].pct}%</strong> del total
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Budget vs Reale per progetto */}
@@ -181,42 +328,24 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
           {proyBudgetReal.length === 0
             ? <div style={{ textAlign: "center", color: "#a0aec0", padding: "25px 0", fontSize: 12 }}>Nessun progetto accettato</div>
             : proyBudgetReal.map(p => (
-              <div key={p.id} style={{ marginBottom: 11 }}>
+              <div key={p.id} style={{ marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "#2d3748", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.cliente}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: p.diff >= 0 ? "#276749" : "#c53030" }}>
-                    {p.diff >= 0 ? "+" : ""}{p.diff}% margine
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#2d3748", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {p.cliente}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 99,
+                    background: p.diff >= 0 ? "#f0fff4" : "#fff5f5",
+                    color: p.diff >= 0 ? "#276749" : "#c53030" }}>
+                    {p.diff >= 0 ? "+" : ""}{p.diff}%
                   </span>
                 </div>
-                <div style={{ display: "flex", gap: 4 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 9, color: "#718096", marginBottom: 2 }}>Preventivato: {fmt(p.prev)}</div>
-                    <MiniBar value={p.prev} max={Math.max(p.prev, p.real) * 1.1} color="#805ad5" />
-                  </div>
-                </div>
-                <div style={{ flex: 1, marginTop: 3 }}>
-                  <div style={{ fontSize: 9, color: "#718096", marginBottom: 2 }}>Costo reale: {fmt(p.real)}</div>
-                  <MiniBar value={p.real} max={Math.max(p.prev, p.real) * 1.1} color={p.real <= p.prev ? "#68d391" : "#fc8181"} />
-                </div>
+                <div style={{ fontSize: 9, color: "#718096", marginBottom: 2 }}>Prev. {fmt(p.prev)}</div>
+                <MiniBar value={p.prev} max={Math.max(p.prev, p.real) * 1.1} color="#805ad5" />
+                <div style={{ fontSize: 9, color: "#718096", margin: "4px 0 2px" }}>Reale {fmt(p.real)}</div>
+                <MiniBar value={p.real} max={Math.max(p.prev, p.real) * 1.1} color={p.real <= p.prev ? "#68d391" : "#fc8181"} />
               </div>
             ))
           }
-        </div>
-
-        {/* Bar chart stati */}
-        <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 12 }}>📊 {t.graficosEstados}</div>
-          {proyectos.length === 0
-            ? <div style={{ textAlign: "center", color: "#a0aec0", padding: "25px 0", fontSize: 13 }}>{t.noProy}</div>
-            : <BarChart data={barData} />}
-        </div>
-
-        {/* Pie chart categorie */}
-        <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 12 }}>🥧 {t.graficosCategorias}</div>
-          {pieData.length === 0
-            ? <div style={{ textAlign: "center", color: "#a0aec0", padding: "25px 0", fontSize: 13 }}>Sin datos de costos</div>
-            : <PieChart data={pieData} />}
         </div>
 
         {/* Top clientes */}
@@ -226,11 +355,16 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
             ? <div style={{ color: "#a0aec0", fontSize: 12 }}>{t.sinProy}</div>
             : topClientes.map((c, i) => (
               <div key={c.nombre} style={{
-                display: "flex", justifyContent: "space-between",
-                padding: "7px 10px", borderRadius: 8,
-                background: i === 0 ? "#f0fff4" : "#f7fafc", marginBottom: 5,
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "8px 12px", borderRadius: 9,
+                background: i === 0 ? "#f0fff4" : "#f7fafc",
+                border: i === 0 ? "1px solid #9ae6b4" : "1px solid transparent",
+                marginBottom: 6,
               }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#2d3748" }}>{i + 1}. {c.nombre}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 14 }}>{["🥇","🥈","🥉","4️⃣"][i] || (i+1)+"."}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#2d3748" }}>{c.nombre}</span>
+                </div>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#276749" }}>{fmt(c.total)}</span>
               </div>
             ))
@@ -244,8 +378,7 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
             <div
               key={p.id}
               onClick={() => onOpenProject(p)}
-              role="button"
-              tabIndex={0}
+              role="button" tabIndex={0}
               onKeyDown={e => e.key === "Enter" && onOpenProject(p)}
               style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -261,8 +394,8 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
               </div>
               <span style={{
                 padding: "2px 9px", borderRadius: 99, fontSize: 11, fontWeight: 700,
-                background: ESTADO_BG[p.estado] || "#f7fafc",
-                color: ESTADO_COLORS[p.estado] || "#718096",
+                background: ESTADO_BG[p.estado]    || "#f7fafc",
+                color:      ESTADO_COLORS[p.estado] || "#718096",
               }}>
                 {t[p.estado?.toLowerCase()] || p.estado}
               </span>

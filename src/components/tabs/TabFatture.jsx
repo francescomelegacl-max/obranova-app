@@ -17,7 +17,7 @@ function calcTotals(partidas, pct) {
   return { cd, ci, gf, imprev, sub, util, total, ivaAmt, totalIva };
 }
 
-// ─── Modal Nuova Fattura ──────────────────────────────────────────────────────
+// ─── Modal Nueva Factura ──────────────────────────────────────────────────────
 function ModalNuovaFattura({ proy, prossimoNumero, onSalva, onClose }) {
   const totals = calcTotals(proy.partidas, proy.pct);
   const totale = proy.iva ? totals.totalIva : totals.total;
@@ -25,9 +25,9 @@ function ModalNuovaFattura({ proy, prossimoNumero, onSalva, onClose }) {
   const [form, setForm] = useState({
     numero:      prossimoNumero,
     dataFattura: new Date().toISOString().slice(0, 10),
-    dataScadenza: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    dataVencimiento: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     note:        "",
-    importo:     totale,
+    importe:     totale,
   });
 
   return (
@@ -35,7 +35,7 @@ function ModalNuovaFattura({ proy, prossimoNumero, onSalva, onClose }) {
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.65)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ background: "white", borderRadius: 16, padding: 28, width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,.35)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: "#1a365d" }}>🧾 Nuova Fattura</div>
+          <div style={{ fontSize: 17, fontWeight: 800, color: "#1a365d" }}>🧾 Nueva Factura</div>
           <button onClick={onClose} style={{ background: "#2d3748", border: "none", borderRadius: 8, cursor: "pointer", padding: "5px 12px", color: "white", fontWeight: 700 }}>✕</button>
         </div>
 
@@ -54,7 +54,7 @@ function ModalNuovaFattura({ proy, prossimoNumero, onSalva, onClose }) {
           </div>
           <div>
             <label style={{ fontSize: 11, color: "#718096", fontWeight: 600, display: "block", marginBottom: 4 }}>Importo (€/$)</label>
-            <input type="number" value={form.importo} onChange={e => setForm(f => ({ ...f, importo: parseFloat(e.target.value) || 0 }))}
+            <input type="number" value={form.importe} onChange={e => setForm(f => ({ ...f, importe: parseFloat(e.target.value) || 0 }))}
               style={{ width: "100%", padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13 }} />
           </div>
           <div>
@@ -64,7 +64,7 @@ function ModalNuovaFattura({ proy, prossimoNumero, onSalva, onClose }) {
           </div>
           <div>
             <label style={{ fontSize: 11, color: "#718096", fontWeight: 600, display: "block", marginBottom: 4 }}>Scadenza pagamento</label>
-            <input type="date" value={form.dataScadenza} onChange={e => setForm(f => ({ ...f, dataScadenza: e.target.value }))}
+            <input type="date" value={form.dataScadenza} onChange={e => setForm(f => ({ ...f, dataVencimiento: e.target.value }))}
               style={{ width: "100%", padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13 }} />
           </div>
         </div>
@@ -72,20 +72,20 @@ function ModalNuovaFattura({ proy, prossimoNumero, onSalva, onClose }) {
         <div style={{ marginBottom: 16 }}>
           <label style={{ fontSize: 11, color: "#718096", fontWeight: 600, display: "block", marginBottom: 4 }}>Note (opzionale)</label>
           <textarea value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-            rows={2} placeholder="Es. Bonifico IBAN IT..."
+            rows={2} placeholder="Ej. Transferencia bancaria..."
             style={{ width: "100%", padding: "8px 10px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, resize: "vertical" }} />
         </div>
 
         <button onClick={() => onSalva(form)}
           style={{ width: "100%", padding: 12, background: "#1a365d", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 15 }}>
-          ✅ Crea fattura
+          ✅ Crear factura
         </button>
       </div>
     </div>
   );
 }
 
-// ─── PDF Fattura (stampa) ─────────────────────────────────────────────────────
+// ─── PDF Factura (imprimir) ─────────────────────────────────────────────────────
 function PDFFattura({ fattura, proy, onClose }) {
   const totals = calcTotals(proy.partidas, proy.pct);
   const cats   = [...new Set((proy.partidas || []).map(p => p.cat).filter(Boolean))];
@@ -97,14 +97,14 @@ function PDFFattura({ fattura, proy, onClose }) {
 
         {/* Barra azioni */}
         <div style={{ background: "#1a365d", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ color: "white", fontWeight: 700, fontSize: 14 }}>🧾 Fattura N° {fattura.numero}</div>
+          <div style={{ color: "white", fontWeight: 700, fontSize: 14 }}>🧾 Factura N° {fattura.numero}</div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => window.print()} style={{ padding: "6px 14px", background: "#276749", color: "white", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>🖨️ Stampa PDF</button>
+            <button onClick={() => window.print()} style={{ padding: "6px 14px", background: "#276749", color: "white", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>🖨️ Imprimir PDF</button>
             <button onClick={onClose} style={{ padding: "6px 12px", background: "rgba(255,255,255,.2)", color: "white", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700 }}>✕</button>
           </div>
         </div>
 
-        {/* Contenuto fattura */}
+        {/* Contenido factura */}
         <div id="print-area" style={{ padding: "32px 36px", fontSize: 12 }}>
 
           {/* Header */}
@@ -117,10 +117,10 @@ function PDFFattura({ fattura, proy, onClose }) {
               <div style={{ color: "#718096", fontSize: 11 }}>{EMPRESA.telefono} · {EMPRESA.email}</div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 24, fontWeight: 900, color: "#1a365d", marginBottom: 4 }}>FATTURA</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: "#1a365d", marginBottom: 4 }}>FACTURA</div>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#2d3748" }}>N° {fattura.numero}</div>
-              <div style={{ fontSize: 11, color: "#718096", marginTop: 4 }}>Data: {fattura.dataFattura}</div>
-              <div style={{ fontSize: 11, color: "#718096" }}>Scadenza: {fattura.dataScadenza}</div>
+              <div style={{ fontSize: 11, color: "#718096", marginTop: 4 }}>Fecha: {fattura.dataFattura}</div>
+              <div style={{ fontSize: 11, color: "#718096" }}>Vencimiento: {fattura.dataScadenza}</div>
               <span style={{ display: "inline-block", marginTop: 6, padding: "3px 12px", borderRadius: 99, fontSize: 11, fontWeight: 700,
                 background: fattura.pagata ? "#f0fff4" : "#fffff0",
                 color:      fattura.pagata ? "#276749" : "#b7791f",
@@ -133,7 +133,7 @@ function PDFFattura({ fattura, proy, onClose }) {
           {/* Cliente */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
             <div style={{ background: "#f7fafc", borderRadius: 9, padding: "12px 14px" }}>
-              <div style={{ fontSize: 10, color: "#a0aec0", fontWeight: 700, marginBottom: 6, letterSpacing: .5 }}>FATTURATO A</div>
+              <div style={{ fontSize: 10, color: "#a0aec0", fontWeight: 700, marginBottom: 6, letterSpacing: .5 }}>FACTURATO A</div>
               <div style={{ fontWeight: 700, fontSize: 14, color: "#1a365d" }}>{proy.info?.cliente || "—"}</div>
               {proy.info?.telefono && <div style={{ fontSize: 11, color: "#4a5568", marginTop: 2 }}>📞 {proy.info.telefono}</div>}
               {proy.info?.email    && <div style={{ fontSize: 11, color: "#4a5568" }}>✉ {proy.info.email}</div>}
@@ -152,7 +152,7 @@ function PDFFattura({ fattura, proy, onClose }) {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
               <thead>
                 <tr style={{ background: "#1a365d", color: "white" }}>
-                  {["Descrizione", "Cat.", "U.M.", "Qty", "Prezzo unit.", "Totale"].map((h, i) => (
+                  {["Descripción", "Cat.", "U.M.", "Qty", "Prezzo unit.", "Total"].map((h, i) => (
                     <th key={i} style={{ padding: "8px 10px", textAlign: i > 2 ? "right" : "left", fontWeight: 600 }}>{h}</th>
                   ))}
                 </tr>
@@ -176,15 +176,15 @@ function PDFFattura({ fattura, proy, onClose }) {
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
             <div style={{ width: 280 }}>
               {[
-                ["Imponibile", totals.cd],
+                ["Base imponible", totals.cd],
                 proy.pct?.ci > 0 && [`C.Indiretti (${proy.pct.ci}%)`, totals.ci],
                 proy.pct?.gf > 0 && [`Spese fisse (${proy.pct.gf}%)`, totals.gf],
                 proy.pct?.imprevistos > 0 && [`Imprevisti (${proy.pct.imprevistos}%)`, totals.imprev],
                 proy.pct?.utilidad > 0 && [`Utile (${proy.pct.utilidad}%)`, totals.util],
                 ["Totale s/IVA", totals.total, true],
                 proy.iva && ["IVA 19%", totals.ivaAmt],
-                proy.iva && ["TOTALE FATTURA", totals.totalIva, true, true],
-                !proy.iva && ["TOTALE FATTURA", totals.total, true, true],
+                proy.iva && ["TOTALE FACTURA", totals.totalIva, true, true],
+                !proy.iva && ["TOTALE FACTURA", totals.total, true, true],
               ].filter(Boolean).map(([label, value, bold, big]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: big ? "10px 12px" : "5px 0",
                   background: big ? "#1a365d" : "transparent", borderRadius: big ? 8 : 0,
@@ -219,20 +219,20 @@ export function TabFatture({ proyectos, fatture, onCreaFattura, onTogglePagata, 
   const [showNuova,   setShowNuova]   = useState(false);
   const [proySelected, setProySelected] = useState(null);
   const [viewFattura, setViewFattura] = useState(null);
-  const [filterStato, setFilterStato] = useState("Tutti");
+  const [filterStato, setFilterStato] = useState("Todos");
 
   // Progetto corrente (quello aperto nell'app)
   const proyAceptados = proyectos.filter(p => p.estado === "Aceptado");
 
   const fattureFiltrate = useMemo(() => {
-    if (filterStato === "Tutti")   return fatture;
-    if (filterStato === "Pagate")  return fatture.filter(f => f.pagata);
-    if (filterStato === "Attesa")  return fatture.filter(f => !f.pagata);
+    if (filterStato === "Todos")   return fatture;
+    if (filterStato === "Pagadas")  return fatture.filter(f => f.pagata);
+    if (filterStato === "Pendientes")  return fatture.filter(f => !f.pagata);
     return fatture;
   }, [fatture, filterStato]);
 
-  const totaleIncassato = useMemo(() => fatture.filter(f => f.pagata).reduce((s, f) => s + (f.importo || 0), 0), [fatture]);
-  const totaleAttesa    = useMemo(() => fatture.filter(f => !f.pagata).reduce((s, f) => s + (f.importo || 0), 0), [fatture]);
+  const totaleCobrado = useMemo(() => fatture.filter(f => f.pagata).reduce((s, f) => s + (f.importe || 0), 0), [fatture]);
+  const totaleAttesa    = useMemo(() => fatture.filter(f => !f.pagata).reduce((s, f) => s + (f.importe || 0), 0), [fatture]);
   const prossimoNumero  = useMemo(() => {
     if (!fatture.length) return `F-${new Date().getFullYear()}-001`;
     const nums = fatture.map(f => parseInt((f.numero || "0").replace(/\D/g, "")) || 0);
@@ -281,10 +281,10 @@ export function TabFatture({ proyectos, fatture, onCreaFattura, onTogglePagata, 
         <div style={{ color: "#a0aec0", fontSize: 12, marginBottom: 12 }}>Converti i preventivi accettati in fatture</div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           {[
-            { label: "Fatture totali",  value: fatture.length,          color: "white" },
-            { label: "Incassato",       value: fmt(totaleIncassato),     color: "#68d391" },
-            { label: "In attesa",       value: fmt(totaleAttesa),        color: "#fef08a" },
-            { label: "Preventivi ok",   value: proyAceptados.length,     color: "#90cdf4" },
+            { label: "Facturas totales",  value: fatture.length,          color: "white" },
+            { label: "Cobrado",       value: fmt(totaleCobrado),     color: "#68d391" },
+            { label: "Pendiente",       value: fmt(totaleAttesa),        color: "#fef08a" },
+            { label: "Presupuestos ok",   value: proyAceptados.length,     color: "#90cdf4" },
           ].map(({ label, value, color }) => (
             <div key={label} style={{ background: "rgba(255,255,255,.1)", borderRadius: 9, padding: "8px 16px", textAlign: "center", minWidth: 90 }}>
               <div style={{ fontSize: 18, fontWeight: 900, color }}>{value}</div>
@@ -294,11 +294,11 @@ export function TabFatture({ proyectos, fatture, onCreaFattura, onTogglePagata, 
         </div>
       </div>
 
-      {/* Preventivi accettati → converti in fattura */}
+      {/* Presupuestos aceptados → converti in fattura */}
       {proyAceptados.length > 0 && (
         <div style={{ background: "white", borderRadius: 12, padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 10 }}>
-            ✅ Preventivi accettati — pronti per la fattura
+            ✅ Presupuestos aceptados — listos para facturar
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {proyAceptados.map(p => {
@@ -314,10 +314,10 @@ export function TabFatture({ proyectos, fatture, onCreaFattura, onTogglePagata, 
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ fontWeight: 800, fontSize: 15, color: "#276749" }}>{fmt(tot)}</div>
                     {hasFattura
-                      ? <span style={{ padding: "3px 10px", background: "#ebf8ff", color: "#2b6cb0", borderRadius: 99, fontSize: 11, fontWeight: 700 }}>Fatturato</span>
+                      ? <span style={{ padding: "3px 10px", background: "#ebf8ff", color: "#2b6cb0", borderRadius: 99, fontSize: 11, fontWeight: 700 }}>Facturado</span>
                       : <button onClick={() => handleNuovaFattura(p)}
                           style={{ padding: "6px 14px", background: "#1a365d", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>
-                          🧾 Crea fattura
+                          🧾 Crear factura
                         </button>
                     }
                   </div>
@@ -330,9 +330,9 @@ export function TabFatture({ proyectos, fatture, onCreaFattura, onTogglePagata, 
 
       {/* Filtri fatture */}
       <div style={{ background: "white", borderRadius: 12, padding: "10px 14px", boxShadow: "0 1px 4px rgba(0,0,0,.07)", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginRight: 4 }}>Storico fatture</div>
+        <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginRight: 4 }}>Historial facturas</div>
         <div style={{ display: "flex", gap: 4, background: "#f0f4f8", borderRadius: 8, padding: 3 }}>
-          {["Tutti", "Pagate", "Attesa"].map(v => (
+          {["Todos", "Pagadas", "Pendientes"].map(v => (
             <button key={v} onClick={() => setFilterStato(v)}
               style={{ padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600,
                 background: filterStato === v ? "#2b6cb0" : "transparent",
@@ -347,8 +347,8 @@ export function TabFatture({ proyectos, fatture, onCreaFattura, onTogglePagata, 
       {fattureFiltrate.length === 0 ? (
         <div style={{ textAlign: "center", padding: "50px 0", color: "#a0aec0", background: "white", borderRadius: 12 }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>🧾</div>
-          <div>Nessuna fattura ancora</div>
-          <div style={{ fontSize: 11, marginTop: 6 }}>Accetta un preventivo e clicca "Crea fattura"</div>
+          <div>Sin facturas aún</div>
+          <div style={{ fontSize: 11, marginTop: 6 }}>Acepta un presupuesto e clicca "Crear factura"</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -364,18 +364,18 @@ export function TabFatture({ proyectos, fatture, onCreaFattura, onTogglePagata, 
                       background: f.pagata ? "#f0fff4" : scaduta ? "#fff5f5" : "#fffff0",
                       color:      f.pagata ? "#276749" : scaduta ? "#c53030" : "#b7791f",
                       border:     `1px solid ${f.pagata ? "#9ae6b4" : scaduta ? "#fed7d7" : "#fef08a"}` }}>
-                      {f.pagata ? "✅ Pagata" : scaduta ? "🔴 Scaduta" : "⏳ In attesa"}
+                      {f.pagata ? "✅ Pagada" : scaduta ? "🔴 Vencida" : "⏳ Pendiente"}
                     </span>
                   </div>
                   <div style={{ fontSize: 12, color: "#2d3748", fontWeight: 600 }}>{f.proyInfo?.cliente || "—"}</div>
                   <div style={{ fontSize: 11, color: "#718096" }}>
-                    Emessa: {f.dataFattura} · Scadenza: {f.dataScadenza}
+                    Emitida: {f.dataFattura} · Vencimiento: {f.dataScadenza}
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontWeight: 900, fontSize: 16, color: "#276749" }}>{fmt(f.importo)}</div>
-                    <div style={{ fontSize: 10, color: "#a0aec0" }}>importo</div>
+                    <div style={{ fontWeight: 900, fontSize: 16, color: "#276749" }}>{fmt(f.importe)}</div>
+                    <div style={{ fontSize: 10, color: "#a0aec0" }}>importe</div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button onClick={() => setViewFattura(f)}
@@ -384,7 +384,7 @@ export function TabFatture({ proyectos, fatture, onCreaFattura, onTogglePagata, 
                     </button>
                     <button onClick={() => onTogglePagata(f.id, !f.pagata)}
                       style={{ padding: "5px 10px", background: f.pagata ? "#fff5f5" : "#f0fff4", border: `1px solid ${f.pagata ? "#fed7d7" : "#9ae6b4"}`, borderRadius: 7, cursor: "pointer", color: f.pagata ? "#c53030" : "#276749", fontSize: 11, fontWeight: 600 }}>
-                      {f.pagata ? "↩ Annulla" : "✅ Pagata"}
+                      {f.pagata ? "↩ Revertir" : "✅ Pagada"}
                     </button>
                     <button onClick={() => onEliminaFattura(f.id)}
                       style={{ padding: "5px 8px", background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: 7, cursor: "pointer", color: "#c53030", fontSize: 11 }}>

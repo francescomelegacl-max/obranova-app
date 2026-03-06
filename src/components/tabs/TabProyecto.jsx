@@ -1,6 +1,8 @@
 // ─── components/tabs/TabProyecto.jsx ────────────────────────────────────────
+import { useState } from "react";
 import { Tip } from "../UI";
 import { ESTADOS, ESTADO_COLORS, ESTADO_BG } from "../../utils/constants";
+import ModalTemplates from "../ModalTemplates";
 
 export default function TabProyecto({
   info, setInfo,
@@ -11,11 +13,25 @@ export default function TabProyecto({
   condPago, setCondPago,
   condPagoPersonalizado, setCondPagoPersonalizado,
   cuotas, setCuotas,
+  partidas = [],
   t,
 }) {
+  const [showTemplates,   setShowTemplates]   = useState(false);
+  const [templateApplied, setTemplateApplied] = useState("");
   const venceDate = info.fecha
     ? new Date(new Date(info.fecha).getTime() + validez * 86400000).toLocaleDateString("es-CL")
     : "—";
+
+  // Applica template al progetto corrente
+  const handleApplyTemplate = (tpl) => {
+    if (tpl.pct)      Object.entries(tpl.pct).forEach(([k, v]) => setPct({ [k]: v }));
+    if (tpl.condPago) setCondPago(tpl.condPago);
+    if (tpl.condPagoPersonalizado) setCondPagoPersonalizado(tpl.condPagoPersonalizado);
+    if (tpl.cuotas)   setCuotas(tpl.cuotas);
+    if (typeof tpl.iva === "boolean") setIva(tpl.iva);
+    setTemplateApplied(tpl.nombre);
+    setTimeout(() => setTemplateApplied(""), 3000);
+  };
 
   const inputStyle = {
     width: "100%", padding: "9px 12px", border: "1px solid #e2e8f0",
@@ -27,7 +43,44 @@ export default function TabProyecto({
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 14 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* Modal Templates */}
+      {showTemplates && (
+        <ModalTemplates
+          partidas={partidas} pct={pct}
+          condPago={condPago} condPagoPersonalizado={condPagoPersonalizado}
+          cuotas={cuotas} iva={iva}
+          onApplyTemplate={handleApplyTemplate}
+          onClose={() => setShowTemplates(false)}
+        />
+      )}
+
+      {/* Barra templates */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "white", borderRadius: 12, padding: "12px 16px",
+        boxShadow: "0 1px 4px rgba(0,0,0,.07)", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#1a365d" }}>📋 Templates</span>
+          <span style={{ fontSize: 12, color: "#718096" }}>Carga configuraciones guardadas o guarda esta como template</span>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {templateApplied && (
+            <span style={{ fontSize: 12, color: "#276749", fontWeight: 700,
+              background: "#f0fff4", padding: "4px 10px", borderRadius: 7, border: "1px solid #9ae6b4" }}>
+              ✅ Aplicado: {templateApplied}
+            </span>
+          )}
+          <button onClick={() => setShowTemplates(true)}
+            style={{ padding: "8px 16px", background: "#1a365d", color: "white", border: "none",
+              borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 13,
+              display: "flex", alignItems: "center", gap: 6 }}>
+            📋 Gestionar templates
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 14 }}>
 
       {/* Datos del cliente */}
       <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
@@ -238,6 +291,7 @@ export default function TabProyecto({
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

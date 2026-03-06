@@ -11,9 +11,7 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
@@ -35,29 +33,75 @@ input::placeholder, textarea::placeholder {
   opacity: 1 !important;
 }
 
+/* ─── Forza light mode ──────────────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: only light;
-    color: #1a365d;
-    background-color: #f0f4f8;
-  }
-  body {
-    background-color: #f0f4f8 !important;
-    color: #1a365d !important;
-  }
-  input, select, textarea {
-    color: #1a365d !important;
-    background-color: #ffffff !important;
-    color-scheme: light;
-  }
+  :root { color-scheme: only light; color: #1a365d; background-color: #f0f4f8; }
+  body  { background-color: #f0f4f8 !important; color: #1a365d !important; }
+  input, select, textarea { color: #1a365d !important; background-color: #ffffff !important; color-scheme: light; }
 }
 
-button {
-  font-family: inherit;
-  cursor: pointer;
+button { font-family: inherit; cursor: pointer; }
+a { color: #2b6cb0; text-decoration: inherit; }
+
+/* ─── Shimmer (TabCostos ML skeleton) ──────────────────────────── */
+@keyframes shimmer {
+  0%, 100% { opacity: .7; }
+  50%       { opacity: .3; }
 }
 
-a {
-  color: #2b6cb0;
-  text-decoration: inherit;
+/* ─── Mobile: touch targets e layout ───────────────────────────── */
+@media (max-width: 640px) {
+  /* Bottoni header più grandi al tocco */
+  header button { min-height: 40px; }
+
+  /* Nav tab scrollabile, niente scrollbar visibile */
+  nav {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  nav::-webkit-scrollbar { display: none; }
+
+  /* Tab singolo: snap + altezza minima 44px (touch target Apple HIG) */
+  nav button[role="tab"] {
+    scroll-snap-align: start;
+    min-height: 44px;
+  }
+
+  /* Padding ridotto su mobile */
+  main { padding: 8px !important; }
+
+  /* Input più alti: 16px evita zoom automatico su iOS */
+  input, select, textarea { min-height: 40px; font-size: 16px !important; }
+
+  /* Bottoni stato più toccabili */
+  button { min-height: 36px; }
+}
+
+/* ─── Tablet: layout ibrido ─────────────────────────────────────── */
+@media (min-width: 641px) and (max-width: 1024px) {
+  nav { scrollbar-width: none; }
+  nav::-webkit-scrollbar { display: none; }
+}
+
+/* ─── Print: PDF professionale ──────────────────────────────────── */
+@media print {
+  @page { margin: 15mm 12mm; size: A4 portrait; }
+
+  body { background: white !important; color: #1a1a1a !important; font-size: 11pt; }
+
+  .no-print { display: none !important; }
+
+  /* Evita interruzioni di pagina nelle sezioni */
+  table, .print-block { page-break-inside: avoid; break-inside: avoid; }
+  tr { page-break-inside: avoid; }
+
+  /* Forza stampa dei colori (intestazione tabella, badge stato ecc.) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Nasconde ombre e bordi inutili */
+  [style*="boxShadow"] { box-shadow: none !important; }
 }

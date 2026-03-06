@@ -23,13 +23,13 @@ const FormArticolo = ({ cats, initial, onSave, onClose }) => {
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.65)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ background: "white", borderRadius: 16, padding: 24, width: "100%", maxWidth: 500, maxHeight: "90vh", overflow: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.35)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <div style={{ fontSize: 17, fontWeight: 700, color: "#1a365d" }}>📦 {initial ? "Modifica articolo" : "Nuovo articolo"}</div>
+          <div style={{ fontSize: 17, fontWeight: 700, color: "#1a365d" }}>📦 {initial ? "Editar artículo" : "Nuevo artículo"}</div>
           <button onClick={onClose} style={{ background: "#2d3748", border: "none", borderRadius: 8, cursor: "pointer", padding: "5px 12px", color: "white", fontWeight: 700 }}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
             <label style={labelStyle}>Nome articolo *</label>
-            <input value={f.nome} onChange={e => u("nome", e.target.value)} autoFocus style={inputStyle} placeholder="Es. Cemento Portland 42.5" />
+            <input value={f.nome} onChange={e => u("nome", e.target.value)} autoFocus style={inputStyle} placeholder="Ej. Cemento Portland 42.5" />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <div>
@@ -61,14 +61,14 @@ const FormArticolo = ({ cats, initial, onSave, onClose }) => {
           </div>
           <div>
             <label style={labelStyle}>Fornitore</label>
-            <input value={f.fornitore} onChange={e => u("fornitore", e.target.value)} style={inputStyle} placeholder="Es. Sodimac, Easy..." />
+            <input value={f.fornitore} onChange={e => u("fornitore", e.target.value)} style={inputStyle} placeholder="Ej. Sodimac, Easy..." />
           </div>
           <div>
             <label style={labelStyle}>Note</label>
-            <textarea value={f.note} onChange={e => u("note", e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical" }} placeholder="Note interne..." />
+            <textarea value={f.note} onChange={e => u("note", e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical" }} placeholder="Notas internas..." />
           </div>
           <button onClick={ok} style={{ padding: 11, background: "#1a365d", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 14, marginTop: 4 }}>
-            💾 {initial ? "Aggiorna" : "Aggiungi al magazzino"}
+            💾 {initial ? "Actualizar" : "Agregar a bodega"}
           </button>
         </div>
       </div>
@@ -98,7 +98,7 @@ const ModalMovimento = ({ item, proyectos, onSave, onClose }) => {
         <div style={{ background: "#f7fafc", borderRadius: 9, padding: "10px 14px", marginBottom: 14 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "#1a365d" }}>{item.nome}</div>
           <div style={{ fontSize: 12, color: "#718096", marginTop: 2 }}>
-            Giacenza attuale: <strong style={{ color: "#276749" }}>{item.giacenza} {item.unita}</strong>
+            Stock actual: <strong style={{ color: "#276749" }}>{item.giacenza} {item.unita}</strong>
           </div>
         </div>
 
@@ -115,7 +115,7 @@ const ModalMovimento = ({ item, proyectos, onSave, onClose }) => {
         {/* Quantità */}
         <div style={{ marginBottom: 12 }}>
           <label style={{ fontSize: 12, color: "#4a5568", fontWeight: 600, display: "block", marginBottom: 3 }}>
-            {tipo === MOVIMENTO_TYPES.RETTIFICA ? "Nuova giacenza esatta" : "Quantità"} ({item.unita})
+            {tipo === MOVIMENTO_TYPES.RETTIFICA ? "Nueva cantidad exacta" : "Cantidad"} ({item.unita})
           </label>
           <input type="number" value={quantita} onChange={e => setQuantita(e.target.value)} min={0} autoFocus
             style={{ width: "100%", padding: "10px 12px", border: "2px solid #e2e8f0", borderRadius: 8, fontSize: 15, color: "#1a365d", boxSizing: "border-box", fontWeight: 700 }} />
@@ -136,7 +136,7 @@ const ModalMovimento = ({ item, proyectos, onSave, onClose }) => {
         {/* Note */}
         <div style={{ marginBottom: 16 }}>
           <label style={{ fontSize: 12, color: "#4a5568", fontWeight: 600, display: "block", marginBottom: 3 }}>Note</label>
-          <input value={note} onChange={e => setNote(e.target.value)} placeholder="Es. Consegna fornitore, Cantiere via Roma..."
+          <input value={note} onChange={e => setNote(e.target.value)} placeholder="Ej. Entrega proveedor, Obra calle..."
             style={{ width: "100%", padding: "9px 12px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, color: "#1a365d", boxSizing: "border-box" }} />
         </div>
 
@@ -197,13 +197,13 @@ export default function TabMagazzino({ items, movimenti, itemsInAlert, loading, 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 10 }}>
         <div style={{ background: "linear-gradient(135deg,#1a365d,#2d3748)", borderRadius: 12, padding: "14px 16px", color: "white", gridColumn: "span 2" }}>
           <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 2 }}>🏭 Magazzino</div>
-          <div style={{ color: "#a0aec0", fontSize: 12 }}>{items.length} articoli · Valore totale: <strong style={{ color: "white" }}>{fmt(valoreTotale)}</strong></div>
+          <div style={{ color: "#a0aec0", fontSize: 12 }}>{items.length} artículos · Valor total: <strong style={{ color: "white" }}>{fmt(valoreTotale)}</strong></div>
         </div>
         {[
-          { label: "Articoli totali",   value: items.length,            icon: "📦", color: "#2b6cb0", bg: "#ebf8ff" },
-          { label: "Sotto scorta min.", value: itemsInAlert.length,     icon: "⚠️", color: itemsInAlert.length > 0 ? "#c53030" : "#276749", bg: itemsInAlert.length > 0 ? "#fff5f5" : "#f0fff4" },
-          { label: "Valore magazzino",  value: fmt(valoreTotale),       icon: "💰", color: "#276749", bg: "#f0fff4" },
-          { label: "Movimenti oggi",    value: movimenti.filter(m => m.data?.slice(0,10) === new Date().toISOString().slice(0,10)).length, icon: "🔄", color: "#553c9a", bg: "#faf5ff" },
+          { label: "Artículos totales",   value: items.length,            icon: "📦", color: "#2b6cb0", bg: "#ebf8ff" },
+          { label: "Bajo stock mín.", value: itemsInAlert.length,     icon: "⚠️", color: itemsInAlert.length > 0 ? "#c53030" : "#276749", bg: itemsInAlert.length > 0 ? "#fff5f5" : "#f0fff4" },
+          { label: "Valor bodega",  value: fmt(valoreTotale),       icon: "💰", color: "#276749", bg: "#f0fff4" },
+          { label: "Movimientos hoy",    value: movimenti.filter(m => m.data?.slice(0,10) === new Date().toISOString().slice(0,10)).length, icon: "🔄", color: "#553c9a", bg: "#faf5ff" },
         ].map(k => (
           <div key={k.label} style={{ background: k.bg, border: `1px solid ${k.color}22`, borderRadius: 12, padding: "12px 14px" }}>
             <div style={{ fontSize: 18, marginBottom: 2 }}>{k.icon}</div>
@@ -236,7 +236,7 @@ export default function TabMagazzino({ items, movimenti, itemsInAlert, loading, 
           style={{ padding: "8px 14px", background: showMovimenti ? "#1a365d" : "#f0f4f8", color: showMovimenti ? "white" : "#4a5568", border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
           🔄 Movimenti
         </button>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Cerca articolo..."
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Buscar artículo..."
           style={{ padding: "8px 12px", border: "1px solid #e2e8f0", borderRadius: 9, fontSize: 13, color: "#1a365d", minWidth: 180 }} />
 
         {/* Filtri categoria */}
@@ -295,13 +295,13 @@ export default function TabMagazzino({ items, movimenti, itemsInAlert, loading, 
         : filtered.length === 0
           ? <div style={{ textAlign: "center", padding: "50px 0", color: "#a0aec0", background: "white", borderRadius: 12 }}>
               <div style={{ fontSize: 36, marginBottom: 8 }}>📦</div>
-              <div>{items.length === 0 ? "Magazzino vuoto. Aggiungi il primo articolo!" : "Nessun articolo trovato."}</div>
+              <div>{items.length === 0 ? "Bodega vacía. ¡Agrega el primer artículo!" : "Ningún artículo encontrado."}</div>
             </div>
           : <div style={{ background: "white", borderRadius: 12, overflow: "auto", boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 640 }}>
                 <thead>
                   <tr style={{ background: "#1a365d", color: "white" }}>
-                    {["Articolo", "Categoria", "Giacenza", "Scorta min.", "Prezzo/u", "Valore", "Fornitore", ""].map((h, i) => (
+                    {["Artículo", "Categoría", "Stock", "Stock mín.", "Precio/u", "Valor", "Proveedor", ""].map((h, i) => (
                       <th key={i} style={{ padding: "9px 10px", textAlign: "left", fontWeight: 600, fontSize: 11, whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -330,15 +330,15 @@ export default function TabMagazzino({ items, movimenti, itemsInAlert, loading, 
                         <td style={{ padding: "10px 8px", color: "#718096", fontSize: 11 }}>{item.fornitore || "—"}</td>
                         <td style={{ padding: "10px 8px" }}>
                           <div style={{ display: "flex", gap: 5 }}>
-                            <button onClick={() => setMovItem(item)} title="Registra movimento"
+                            <button onClick={() => setMovItem(item)} title="Registrar movimiento"
                               style={{ padding: "5px 9px", background: "#ebf8ff", border: "1px solid #bee3f8", borderRadius: 7, cursor: "pointer", color: "#2b6cb0", fontSize: 12, fontWeight: 600 }}>
                               🔄
                             </button>
-                            <button onClick={() => setEditItem(item)} title="Modifica"
+                            <button onClick={() => setEditItem(item)} title="Editar"
                               style={{ padding: "5px 9px", background: "#f7fafc", border: "1px solid #e2e8f0", borderRadius: 7, cursor: "pointer", color: "#4a5568", fontSize: 12 }}>
                               ✏️
                             </button>
-                            <button onClick={() => onDeleteItem(item.id)} title="Elimina"
+                            <button onClick={() => onDeleteItem(item.id)} title="Eliminar"
                               style={{ padding: "5px 9px", background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: 7, cursor: "pointer", color: "#c53030", fontSize: 12 }}>
                               🗑️
                             </button>
@@ -350,7 +350,7 @@ export default function TabMagazzino({ items, movimenti, itemsInAlert, loading, 
                 </tbody>
                 <tfoot>
                   <tr style={{ background: "#f0f4f8" }}>
-                    <td colSpan={5} style={{ padding: "9px 10px", fontWeight: 700, fontSize: 12, color: "#1a365d" }}>VALORE TOTALE MAGAZZINO</td>
+                    <td colSpan={5} style={{ padding: "9px 10px", fontWeight: 700, fontSize: 12, color: "#1a365d" }}>VALOR TOTAL BODEGA</td>
                     <td style={{ padding: "9px 8px", fontWeight: 800, fontSize: 14, color: "#276749" }}>{fmt(valoreTotale)}</td>
                     <td colSpan={2} />
                   </tr>
