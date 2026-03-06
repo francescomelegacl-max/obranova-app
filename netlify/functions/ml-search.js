@@ -1,30 +1,4 @@
 // netlify/functions/ml-search.js
-let cachedToken = null;
-let tokenExpiry  = 0;
-
-async function getAccessToken() {
-  if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
-
-  const res = await fetch("https://api.mercadolibre.com/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type:    "client_credentials",
-      client_id:     process.env.ML_CLIENT_ID,
-      client_secret: process.env.ML_CLIENT_SECRET,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Token error ${res.status}: ${err}`);
-  }
-  const data = await res.json();
-  cachedToken = data.access_token;
-  tokenExpiry  = Date.now() + (data.expires_in - 60) * 1000;
-  return cachedToken;
-}
-
 export const handler = async (event) => {
   const headers = {
     "Access-Control-Allow-Origin":  "*",
@@ -39,14 +13,15 @@ export const handler = async (event) => {
   if (!q) return { statusCode: 400, headers, body: JSON.stringify({ error: "Parametro q richiesto" }) };
 
   try {
-    const token = await getAccessToken();
+    const token = process.env.ML_ACCESS_TOKEN;
+    if (!token) throw new Error("ML_ACCESS_TOKEN non configurato");
+
     let url = `https://api.mercadolibre.com/sites/${site}/search?q=${encodeURIComponent(q)}&limit=${limit}`;
     if (categoria) url += `&category=${categoria}`;
 
     const res = await fetch(url, {
       headers: {
         "Authorization": `Bearer ${token}`,
-        "User-Agent": "Mozilla/5.0",
         "Accept": "application/json",
       }
     });
