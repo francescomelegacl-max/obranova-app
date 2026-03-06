@@ -3,8 +3,6 @@ import { useState, useCallback, useRef } from "react";
 import { doc, setDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
-const ML_ENDPOINT = "/.netlify/functions/ml-search";
-
 export const ML_CATS = [
   { id: "",         label: "Tutto" },
   { id: "MLC1574",  label: "Construcción" },
@@ -30,13 +28,23 @@ export function useMercadoLibre({ lang = "es", workspaceId, onToast } = {}) {
     abortRef.current = new AbortController();
     setCaricando(true); setErrore(null); setRisultati([]);
     try {
-      let url = `${ML_ENDPOINT}?q=${encodeURIComponent(query)}&limit=12`;
-      if (categoria) url += `&categoria=${categoria}`;
-      const res  = await fetch(url, { signal: abortRef.current.signal });
+      let url = `https://api.mercadolibre.com/sites/MLC/search?q=${encodeURIComponent(query)}&limit=12`;
+      if (categoria) url += `&category=${categoria}`;
+      const res = await fetch(url, { signal: abortRef.current.signal });
       if (!res.ok) throw new Error(`Errore ${res.status}`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setRisultati(data.results || []);
+      setRisultati(data.results?.map(r => ({
+        id:          r.id,
+        titulo:      r.title,
+        precio:      r.price,
+        moneda:      r.currency_id,
+        vendedor:    r.seller?.nickname || "—",
+        thumbnail:   r.thumbnail,
+        link:        r.permalink,
+        disponibili: r.available_quantity,
+        envioGratis: r.shipping?.free_shipping,
+      })) || []);
     } catch (e) {
       if (e.name !== "AbortError") setErrore("Connessione a MercadoLibre fallita");
     } finally { setCaricando(false); }
