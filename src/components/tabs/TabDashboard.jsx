@@ -407,3 +407,4 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
     </div>
   );
 }
+ 
