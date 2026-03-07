@@ -236,20 +236,13 @@ export default function TabCalcolatore({ listino = [], standalone = false, addPa
     setTimeout(() => setAggiuntoACostos(false), 3000);
   }, [addPartida, righe, cats, nome, onToast]);
 
-  // ── WhatsApp: genera PDF en ventana nueva y comparte texto con total ──────────
+  // ── WhatsApp + PDF: scarica PDF poi apre WhatsApp vuoto per allegarlo ──────
   const handleWhatsAppConPDF = useCallback(() => {
-    // Prima apre il PDF
-    handlePDF();
-    // Poi dopo 800ms apre WhatsApp con messaggio + istruzioni per allegare
+    handlePDF();   // 1. scarica/stampa il PDF
     setTimeout(() => {
-      const total = iva ? totals.totIva : totals.total;
-      const texto = `🔨 *${nome || "Presupuesto rápido"}*\n\n` +
-        `📊 ${righe.filter(r=>r.cant>0&&r.pu>0).length} ítems · Margen ${margine}%\n` +
-        `✅ *TOTAL: $${total.toLocaleString("es-CL")}*${iva ? " (IVA inc.)" : ""}\n\n` +
-        `_(Se adjunta el PDF con el detalle completo)_`;
-      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank");
-    }, 800);
-  }, [handlePDF, righe, nome, margine, iva, totals]);
+      window.open("https://wa.me/", "_blank", "noopener,noreferrer"); // 2. apre WA vuoto
+    }, 600);
+  }, [handlePDF]);
 
   // ── Listino filtrato ──────────────────────────────────────────────────────────
   const listinoFiltrato = useMemo(() =>
@@ -405,22 +398,16 @@ export default function TabCalcolatore({ listino = [], standalone = false, addPa
               )}
 
               <button onClick={handlePDF}
-                style={{ padding:"11px",background:"#2b6cb0",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13 }}>
-                🖨️ Exportar PDF
+                style={{ padding:"11px 16px",background:"#2b6cb0",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",gap:6 }}>
+                🖨️ Descargar PDF
               </button>
 
-              {/* ── WhatsApp: PDF + mensaje ── */}
-              <div style={{ display:"flex",gap:6 }}>
-                <button onClick={handleWhatsAppConPDF}
-                  style={{ flex:1,padding:"11px 8px",background:"#25D366",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:12 }}>
-                  💬 WA + PDF
-                </button>
-                <button onClick={handleWhatsApp}
-                  style={{ padding:"11px 10px",background:"#1ead57",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontSize:16 }}
-                  title="Solo mensaje de texto">
-                  💬
-                </button>
-              </div>
+              {/* ── WhatsApp: scarica PDF + apre WA ── */}
+              <button onClick={handleWhatsAppConPDF}
+                title="Descarga el PDF y abre WhatsApp para que puedas adjuntarlo"
+                style={{ padding:"11px 16px",background:"#25D366",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",gap:6 }}>
+                💬 Enviar por WhatsApp
+              </button>
             </div>
           </div>
         </div>
