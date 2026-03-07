@@ -678,53 +678,202 @@ export function TabProyectos({ proyectos, currentId, onLoad, onDelete, onPDF, t 
 
 // ─── TabListino ───────────────────────────────────────────────────────────────
 export function TabListino({ listino, cats, catColors, newCatName, setNewCatName, onAddCat, onDeleteItem, onAddFromListino, onOpenAddModal, DEFAULT_CATS, t }) {
+  const [filterCat, setFilterCat] = useState(null);
+  const [search,    setSearch]    = useState("");
+  const [isMobile,  setIsMobile]  = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+
+  const catColorMap = useMemo(() => {
+    const map = {};
+    cats.forEach((c, i) => { map[c] = catColors[i % catColors.length]; });
+    return map;
+  }, [cats, catColors]);
+
+  const listinoFiltrato = useMemo(() => {
+    let list = [...listino];
+    if (filterCat) list = list.filter(x => x.cat === filterCat);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(x =>
+        (x.nombre || "").toLowerCase().includes(q) ||
+        (x.proveedor || "").toLowerCase().includes(q) ||
+        (x.cat || "").toLowerCase().includes(q)
+      );
+    }
+    list.sort((a, b) => {
+      const ca = (a.cat || "").localeCompare(b.cat || "");
+      return ca !== 0 ? ca : (a.nombre || "").localeCompare(b.nombre || "");
+    });
+    return list;
+  }, [listino, filterCat, search]);
+
+  const counts = useMemo(() => {
+    const c = {};
+    listino.forEach(x => { c[x.cat] = (c[x.cat] || 0) + 1; });
+    return c;
+  }, [listino]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontWeight: 700, fontSize: 15, color: "#1a365d" }}>📦 {t.listino} ({listino.length})</div>
-        <button
-          onClick={onOpenAddModal}
-          style={{ padding: "8px 16px", background: "#276749", color: "white", border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 13 }}
-        >{t.listinoAgregar}</button>
+        <button onClick={onOpenAddModal}
+          style={{ padding: "8px 16px", background: "#276749", color: "white", border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+          {t.listinoAgregar}
+        </button>
       </div>
 
-      {/* Categorías personalizadas */}
-      <div style={{ background: "white", borderRadius: 12, padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 10 }}>🏷️ {t.catPersonalizada}</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 12 }}>
-          {cats.map((cat, i) => (
-            <span key={cat} style={{
-              padding: "4px 12px", borderRadius: 99, fontSize: 12, fontWeight: 600,
-              background: catColors[i % catColors.length] + "18",
-              color: catColors[i % catColors.length],
-              border: `1px solid ${catColors[i % catColors.length]}44`,
-            }}>
-              {cat}{i >= DEFAULT_CATS.length && " ✏️"}
-            </span>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            value={newCatName}
-            onChange={e => setNewCatName(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && onAddCat()}
-            placeholder={t.catNombrePlaceholder}
-            aria-label={t.catAgregar}
-            style={{ flex: 1, padding: "8px 11px", border: "2px solid #e2e8f0", borderRadius: 8, fontSize: 13, color: "#1a365d" }}
+      {/* Barra filtri + ricerca */}
+      <div style={{ background: "white", borderRadius: 12, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,.07)", display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* Ricerca */}
+        <div style={{ position: "relative" }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#a0aec0" }}>🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, proveedor, categoría..."
+            style={{ width: "100%", padding: "9px 12px 9px 32px", border: "1.5px solid #e2e8f0",
+              borderRadius: 9, fontSize: 12, color: "#1a365d", boxSizing: "border-box", outline: "none" }}
+            onFocus={e => e.target.style.borderColor = "#2b6cb0"}
+            onBlur={e  => e.target.style.borderColor = "#e2e8f0"}
           />
-          <button onClick={onAddCat} style={{ padding: "8px 14px", background: "#2b6cb0", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap" }}>
-            {t.catAgregar}
-          </button>
+          {search && (
+            <button onClick={() => setSearch("")}
+              style={{ position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)",
+                background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#a0aec0" }}>✕</button>
+          )}
         </div>
+
+        {/* Filtri categoria */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 7, alignItems: "center" }}>
+          <button onClick={() => setFilterCat(null)}
+            style={{ padding: "5px 13px", borderRadius: 99, fontSize: 11, fontWeight: 700,
+              cursor: "pointer", border: "none",
+              background: !filterCat ? "#1a365d" : "#f0f4f8",
+              color: !filterCat ? "white" : "#718096" }}>
+            Todos ({listino.length})
+          </button>
+          {cats.map((cat, i) => {
+            const col = catColors[i % catColors.length];
+            const active = filterCat === cat;
+            return (
+              <button key={cat} onClick={() => setFilterCat(active ? null : cat)}
+                style={{ padding: "5px 13px", borderRadius: 99, fontSize: 11, fontWeight: 700,
+                  cursor: "pointer",
+                  border: `1.5px solid ${active ? col : col + "55"}`,
+                  background: active ? col + "22" : "white",
+                  color: active ? col : "#718096",
+                  outline: active ? `2px solid ${col}` : "none",
+                  outlineOffset: 1 }}>
+                {cat} {counts[cat] ? `(${counts[cat]})` : ""}
+              </button>
+            );
+          })}
+          {(filterCat || search) && (
+            <button onClick={() => { setFilterCat(null); setSearch(""); }}
+              style={{ marginLeft: "auto", padding: "5px 11px", borderRadius: 99, fontSize: 11,
+                cursor: "pointer", border: "1px solid #fed7d7", background: "#fff5f5", color: "#c53030", fontWeight: 600 }}>
+              ✕ Limpiar
+            </button>
+          )}
+        </div>
+
+        {/* Gestione categorie — collassabile */}
+        <details style={{ borderTop: "1px solid #f0f4f8", paddingTop: 10 }}>
+          <summary style={{ fontSize: 12, color: "#718096", cursor: "pointer", fontWeight: 600, userSelect: "none" }}>
+            🏷️ {t.catPersonalizada} — {cats.length} categorías
+          </summary>
+          <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 10 }}>
+            {cats.map((cat, i) => (
+              <span key={cat} style={{
+                padding: "4px 12px", borderRadius: 99, fontSize: 12, fontWeight: 600,
+                background: catColors[i % catColors.length] + "18",
+                color: catColors[i % catColors.length],
+                border: `1px solid ${catColors[i % catColors.length]}44`,
+              }}>
+                {cat}{i >= DEFAULT_CATS.length && " ✏️"}
+              </span>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input value={newCatName} onChange={e => setNewCatName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && onAddCat()}
+              placeholder={t.catNombrePlaceholder} aria-label={t.catAgregar}
+              style={{ flex: 1, padding: "8px 11px", border: "2px solid #e2e8f0", borderRadius: 8, fontSize: 13, color: "#1a365d" }}
+            />
+            <button onClick={onAddCat}
+              style={{ padding: "8px 14px", background: "#2b6cb0", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap" }}>
+              {t.catAgregar}
+            </button>
+          </div>
+        </details>
       </div>
 
-      {/* Lista materiali */}
+      {/* Lista */}
       {listino.length === 0 ? (
         <div style={{ textAlign: "center", padding: "50px 0", color: "#a0aec0", background: "white", borderRadius: 12 }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>📦</div>
           <div>{t.listinoVacio}</div>
         </div>
+      ) : listinoFiltrato.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px 0", color: "#a0aec0", background: "white", borderRadius: 12 }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+          <div style={{ fontWeight: 600 }}>Sin resultados</div>
+        </div>
+      ) : isMobile ? (
+        /* Mobile: card con separatori categoria */
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {(() => {
+            const rows = [];
+            let lastCat = null;
+            listinoFiltrato.forEach((item, i) => {
+              if (!filterCat && item.cat !== lastCat) {
+                lastCat = item.cat;
+                const col = catColorMap[item.cat] || "#718096";
+                rows.push(
+                  <div key={`div-${item.cat}-${i}`}
+                    style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0 2px" }}>
+                    <div style={{ width: 4, height: 16, borderRadius: 2, background: col, flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, fontWeight: 800, color: col, textTransform: "uppercase", letterSpacing: .5 }}>{item.cat}</span>
+                    <span style={{ fontSize: 10, color: "#a0aec0" }}>({counts[item.cat] || 0})</span>
+                  </div>
+                );
+              }
+              const mg = item.precioCliente > 0 && item.precioCompra > 0
+                ? ((item.precioCliente - item.precioCompra) / item.precioCliente * 100) : null;
+              rows.push(
+                <div key={item.id}
+                  style={{ background: "white", borderRadius: 10, padding: "10px 12px",
+                    boxShadow: "0 1px 3px rgba(0,0,0,.06)", border: "1px solid #f0f4f8",
+                    display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "#1a365d", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.nombre}</div>
+                    <div style={{ fontSize: 10, color: "#a0aec0", marginTop: 2 }}>
+                      {item.unidad || "un"}{item.proveedor ? ` · ${item.proveedor}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "#276749" }}>{fmt(item.precioCliente || item.precio || 0)}</div>
+                    {mg !== null && <span style={{ fontSize: 10, fontWeight: 700, color: mg > 20 ? "#276749" : mg > 10 ? "#b7791f" : "#c53030" }}>{fmtPct(mg)} mg</span>}
+                  </div>
+                  <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                    <button onClick={() => onAddFromListino(item)}
+                      style={{ padding: "6px 10px", background: "#ebf8ff", border: "1px solid #bee3f8", borderRadius: 7, cursor: "pointer", color: "#2b6cb0", fontSize: 12, fontWeight: 700 }}>+</button>
+                    <button onClick={() => onDeleteItem(item.id)}
+                      style={{ padding: "6px 8px", background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: 7, cursor: "pointer", color: "#c53030", fontSize: 11 }}>✕</button>
+                  </div>
+                </div>
+              );
+            });
+            return rows;
+          })()}
+        </div>
       ) : (
+        /* Desktop: tabella con separatori categoria */
         <div style={{ background: "white", borderRadius: 12, overflow: "auto", boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 580 }}>
             <thead>
@@ -735,41 +884,72 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
               </tr>
             </thead>
             <tbody>
-              {listino.map((item, i) => {
-                const mg = item.precioCliente > 0 && item.precioCompra > 0
-                  ? ((item.precioCliente - item.precioCompra) / item.precioCliente * 100)
-                  : null;
-                return (
-                  <tr key={item.id} style={{ background: i % 2 === 0 ? "#f7fafc" : "white" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#ebf8ff"}
-                    onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? "#f7fafc" : "white"}
-                  >
-                    <td style={{ padding: "8px 10px", fontSize: 11, color: "#718096" }}>{item.cat}</td>
-                    <td style={{ padding: "8px 10px", fontWeight: 600, color: "#1a365d" }}>{item.nombre}</td>
-                    <td style={{ padding: "8px 8px", color: "#718096" }}>{item.unidad || "—"}</td>
-                    <td style={{ padding: "8px 10px", color: "#c05621", fontWeight: 600 }}>{item.precioCompra > 0 ? fmt(item.precioCompra) : "—"}</td>
-                    <td style={{ padding: "8px 10px", color: "#276749", fontWeight: 700 }}>{item.precioCliente > 0 ? fmt(item.precioCliente) : item.precio > 0 ? fmt(item.precio) : "—"}</td>
-                    <td style={{ padding: "8px 8px" }}>
-                      {mg !== null ? (
-                        <span style={{
-                          padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 700,
-                          background: mg > 20 ? "#f0fff4" : mg > 10 ? "#fffff0" : "#fff5f5",
-                          color: mg > 20 ? "#276749" : mg > 10 ? "#b7791f" : "#c53030",
-                        }}>{fmtPct(mg)}</span>
-                      ) : "—"}
-                    </td>
-                    <td style={{ padding: "8px 10px", color: "#718096", fontSize: 11 }}>{item.proveedor || "—"}</td>
-                    <td style={{ padding: "8px 8px" }}>
-                      <div style={{ display: "flex", gap: 5 }}>
-                        <button onClick={() => onAddFromListino(item)} style={{ padding: "4px 9px", background: "#ebf8ff", border: "1px solid #bee3f8", borderRadius: 7, cursor: "pointer", color: "#2b6cb0", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>
-                          + {t.costos || "Usar"}
-                        </button>
-                        <button onClick={() => onDeleteItem(item.id)} aria-label="Eliminar" style={{ padding: "4px 8px", background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: 7, cursor: "pointer", color: "#c53030", fontSize: 11 }}>✕</button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {(() => {
+                const rows = [];
+                let lastCat = null;
+                listinoFiltrato.forEach((item, i) => {
+                  if (!filterCat && item.cat !== lastCat) {
+                    lastCat = item.cat;
+                    const col = catColorMap[item.cat] || "#718096";
+                    rows.push(
+                      <tr key={`sep-${item.cat}-${i}`}>
+                        <td colSpan={8} style={{ padding: "10px 12px 4px", background: "#f7fafc", borderTop: i > 0 ? "2px solid #e2e8f0" : "none" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ width: 4, height: 16, borderRadius: 2, background: col }} />
+                            <span style={{ fontSize: 11, fontWeight: 800, color: col, textTransform: "uppercase", letterSpacing: .5 }}>{item.cat}</span>
+                            <span style={{ fontSize: 10, color: "#a0aec0", background: col + "18", padding: "1px 8px", borderRadius: 99, border: `1px solid ${col}33` }}>
+                              {counts[item.cat] || 0} voci
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  const mg = item.precioCliente > 0 && item.precioCompra > 0
+                    ? ((item.precioCliente - item.precioCompra) / item.precioCliente * 100) : null;
+                  rows.push(
+                    <tr key={item.id} style={{ background: i % 2 === 0 ? "#f7fafc" : "white" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#ebf8ff"}
+                      onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? "#f7fafc" : "white"}>
+                      <td style={{ padding: "7px 10px" }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 99,
+                          background: (catColorMap[item.cat] || "#718096") + "18",
+                          color: catColorMap[item.cat] || "#718096",
+                          border: `1px solid ${(catColorMap[item.cat] || "#718096")}33` }}>
+                          {item.cat}
+                        </span>
+                      </td>
+                      <td style={{ padding: "7px 10px", fontWeight: 600, color: "#1a365d" }}>{item.nombre}</td>
+                      <td style={{ padding: "7px 8px", color: "#718096" }}>{item.unidad || "—"}</td>
+                      <td style={{ padding: "7px 10px", color: "#c05621", fontWeight: 600 }}>{item.precioCompra > 0 ? fmt(item.precioCompra) : "—"}</td>
+                      <td style={{ padding: "7px 10px", color: "#276749", fontWeight: 700 }}>{item.precioCliente > 0 ? fmt(item.precioCliente) : item.precio > 0 ? fmt(item.precio) : "—"}</td>
+                      <td style={{ padding: "7px 8px" }}>
+                        {mg !== null ? (
+                          <span style={{ padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 700,
+                            background: mg > 20 ? "#f0fff4" : mg > 10 ? "#fffff0" : "#fff5f5",
+                            color: mg > 20 ? "#276749" : mg > 10 ? "#b7791f" : "#c53030" }}>
+                            {fmtPct(mg)}
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td style={{ padding: "7px 10px", color: "#718096", fontSize: 11 }}>{item.proveedor || "—"}</td>
+                      <td style={{ padding: "7px 8px" }}>
+                        <div style={{ display: "flex", gap: 5 }}>
+                          <button onClick={() => onAddFromListino(item)}
+                            style={{ padding: "4px 9px", background: "#ebf8ff", border: "1px solid #bee3f8",
+                              borderRadius: 7, cursor: "pointer", color: "#2b6cb0", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>
+                            + {t.costos || "Usar"}
+                          </button>
+                          <button onClick={() => onDeleteItem(item.id)} aria-label="Eliminar"
+                            style={{ padding: "4px 8px", background: "#fff5f5", border: "1px solid #fed7d7",
+                              borderRadius: 7, cursor: "pointer", color: "#c53030", fontSize: 11 }}>✕</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                });
+                return rows;
+              })()}
             </tbody>
           </table>
         </div>
@@ -777,6 +957,7 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
     </div>
   );
 }
+
 
 // ─── TabStorico ───────────────────────────────────────────────────────────────
 export function TabStorico({ proyectos, t }) {

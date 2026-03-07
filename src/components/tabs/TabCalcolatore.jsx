@@ -292,12 +292,11 @@ export default function TabCalcolatore({ listino = [], standalone = false, addPa
           style={{ padding:"8px 14px",background:"#276749",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:13 }}>
           🔧 + Mano obra
         </button>
-        {listino.length > 0 && (
-          <button onClick={() => setShowListino(v => !v)}
-            style={{ padding:"8px 14px",background:showListino?"#553c9a":"#f0f4f8",color:showListino?"white":"#4a5568",border:"none",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13 }}>
-            📦 {showListino ? "▲ Cerrar listino" : "▼ Desde listino"}
-          </button>
-        )}
+        <button onClick={() => setShowListino(v => !v)}
+          style={{ padding:"8px 14px",background:showListino?"#553c9a":"#f0f4f8",color:showListino?"white":"#4a5568",border:"none",borderRadius:8,cursor:"pointer",fontWeight:600,fontSize:13,display:"flex",alignItems:"center",gap:6 }}>
+          📦 {showListino ? "▲ Cerrar" : "▼ Desde listino"}
+          {listino.length > 0 && <span style={{ fontSize:10,background:showListino?"rgba(255,255,255,.25)":"#e2e8f0",borderRadius:99,padding:"1px 6px",fontWeight:700 }}>{listino.length}</span>}
+        </button>
         <button onClick={() => { setRighe([]); setNome(""); setSaved(false); }}
           style={{ padding:"8px 12px",background:"#fff5f5",color:"#c53030",border:"1px solid #fed7d7",borderRadius:8,cursor:"pointer",fontSize:12 }}>
           🗑️ Limpiar
