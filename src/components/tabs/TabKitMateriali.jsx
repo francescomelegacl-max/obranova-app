@@ -412,7 +412,7 @@ export default function TabKitMateriali({
       </div>
 
       {/* Lista de kits */}
-      {cargando ? (
+      {cargando && pestana === "mios" ? (
         <div style={{ textAlign: "center", padding: 40, color: "#aaa" }}>Cargando...</div>
       ) : listaFiltrada.length === 0 ? (
         <div style={{ textAlign: "center", padding: 40 }}>
