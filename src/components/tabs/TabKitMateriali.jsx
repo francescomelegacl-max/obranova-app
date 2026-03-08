@@ -46,6 +46,7 @@ export default function TabKitMateriali({
   const [busqueda, setBusqueda] = useState("");
   const [pestana, setPestana] = useState("predefinidos"); // "predefinidos" | "mios"
   const [confirmBorrar, setConfirmBorrar] = useState(null);
+  const [m2, setM2] = useState(1); // moltiplicatore superficie per vista detalle
 
   // ── Estado del editor ─────────────────────────────────────────────────────
   const kitVacio = {
@@ -135,8 +136,6 @@ export default function TabKitMateriali({
   if (vista === "detalle" && kitSeleccionado) {
     const kit = kitSeleccionado;
     const col = COLORES_CAT[kit.categoria] || COLORES_CAT["Personalizado"];
-    const [m2, setM2] = useState(1);
-
     return (
       <div style={{ padding: "16px", maxWidth: 600, margin: "0 auto" }}>
         {/* Header */}
@@ -431,7 +430,7 @@ export default function TabKitMateriali({
             const col = COLORES_CAT[kit.categoria] || COLORES_CAT["Personalizado"];
             return (
               <div key={kit.id || i}
-                onClick={() => { setKitSeleccionado(kit); setVista("detalle"); }}
+                onClick={() => { setKitSeleccionado(kit); setM2(1); setVista("detalle"); }}
                 style={{ background: "#fff", borderRadius: 12, border: "1px solid #e9ecef",
                   padding: "14px", cursor: "pointer", transition: "box-shadow 0.15s, transform 0.1s",
                   display: "flex", alignItems: "center", gap: 14 }}
