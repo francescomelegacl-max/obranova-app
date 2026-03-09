@@ -104,17 +104,20 @@ export default function TabKitMateriali({
   // ── Agregar todo el kit a Costos ──────────────────────────────────────────
   const agregarKitACostos = useCallback((kit, m2 = 1) => {
     if (!addPartida) { onToast?.("⚠️ Función no disponible"); return; }
-    kit.materiales.forEach(mat => {
+    // addPartida con struttura compatibile con ADD_PARTIDA_FROM_LISTINO
+    kit.materiales?.forEach(mat => {
       addPartida({
-        desc: `[Kit: ${kit.nombre}] ${mat.nombre}`,
-        cat: kit.categoria,
-        qty: +(mat.cantidad * m2).toFixed(2),
-        unit: mat.unit || mat.unidad,
-        price: 0,
-        nota: mat.nota || "",
+        nombre:    `[${kit.nombre}] ${mat.nombre}`,
+        cat:       kit.categoria || "Obra Gruesa",
+        unidad:    mat.unidad || mat.unit || "un",
+        cant:      +(mat.cantidad * m2).toFixed(2),
+        pu:        0,
+        visible:   true,
+        proveedor: "",
+        nota:      mat.nota || "",
       });
     });
-    onToast?.(`✅ ${kit.materiales.length} materiales de "${kit.nombre}" agregados a Costos`);
+    onToast?.(`✅ ${kit.materiales?.length || 0} materiales de "${kit.nombre}" agregados a Costos`);
   }, [addPartida, onToast]);
 
   // ── Importar predefinido ──────────────────────────────────────────────────
