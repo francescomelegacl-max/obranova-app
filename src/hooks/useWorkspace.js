@@ -7,7 +7,7 @@
 
 import { useState, useCallback } from "react";
 import {
-  doc, setDoc, getDoc, collection, getDocs,
+  doc, setDoc, getDoc, collection, getDocs, collectionGroup,
   deleteDoc, updateDoc, query, where
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
@@ -48,15 +48,35 @@ export function useWorkspace({ onToast }) {
     const u = uid(); if (!u) return [];
     setLoadingWS(true);
     try {
-      // Cerca workspace dove l'utente è membro
-      const snap = await getDocs(collection(db, "workspaces"));
+      // Usa collectionGroup per trovare solo i workspace dove l'utente è membro
+      // senza dover leggere tutti i workspace (rispetta le security rules)
+      const membersSnap = await getDocs(
+        query(collectionGroup(db, "members"), where("__name__", ">=", `workspaces/`))
+      );
+
+      // Alternativa più semplice e sicura: legge direttamente i workspace
+      // dove l'utente è membro usando il suo uid come path
       const list = [];
-      for (const d of snap.docs) {
-        const memberDoc = await getDoc(doc(db, "workspaces", d.id, "members", u));
-        if (memberDoc.exists()) {
-          list.push({ id: d.id, ...d.data(), myRole: memberDoc.data().role });
+
+      // Strategia: salviamo i workspaceId nei dati utente
+      // Per ora usiamo un approccio diretto: proviamo a leggere
+      // i workspace noti (salvati in users/{uid}/workspaces)
+      try {
+        const userWSSnap = await getDocs(collection(db, "users", u, "workspaces"));
+        for (const d of userWSSnap.docs) {
+          const wsId = d.id;
+          const [wsDoc, memberDoc] = await Promise.all([
+            getDoc(doc(db, "workspaces", wsId)),
+            getDoc(doc(db, "workspaces", wsId, "members", u)),
+          ]);
+          if (wsDoc.exists() && memberDoc.exists()) {
+            list.push({ id: wsId, ...wsDoc.data(), myRole: memberDoc.data().role });
+          }
         }
+      } catch (e2) {
+        console.warn("loadWorkspaces via users:", e2);
       }
+
       setWorkspaces(list);
       return list;
     } catch (e) {
@@ -102,6 +122,11 @@ export function useWorkspace({ onToast }) {
         email:       userEmail() || "",
         displayName: auth.currentUser?.displayName || userEmail() || "Titolare",
         joinedAt:    new Date().toISOString(),
+      });
+      // Salva riferimento workspace anche in users/{uid}/workspaces per lookup veloce
+      await setDoc(doc(db, "users", u, "workspaces", ref.id), {
+        name: name.trim(),
+        joinedAt: new Date().toISOString(),
       });
       onToast("✅ Azienda creata!");
       return { id: ref.id, ...wsData, myRole: ROLES.OWNER };
