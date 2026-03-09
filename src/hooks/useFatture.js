@@ -6,7 +6,10 @@ import { db, auth } from "../lib/firebase";
 export function useFatture({ onToast, workspaceId }) {
   const [fatture, setFatture] = useState([]);
 
-  const basePath = () => workspaceId ? `workspaces/${workspaceId}` : null;
+  const basePath = useCallback(
+    () => workspaceId ? `workspaces/${workspaceId}` : null,
+    [workspaceId]
+  );
 
   const loadFatture = useCallback(async () => {
     const base = basePath(); if (!base) return;

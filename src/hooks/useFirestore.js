@@ -168,7 +168,7 @@ export function useFirestore({ onToast, workspaceId }) {
     proyectos, listino, fotosMap, cats, guardando,
     loadProyectos, saveProyecto, newProyecto, deleteProyecto,
     loadListino, saveListinoItem, deleteListinoItem,
-    updateGiacenza,
+    updateGiacenza, updatePrezzoCompra,
     loadCats, addCat, setCats,
   };
 }

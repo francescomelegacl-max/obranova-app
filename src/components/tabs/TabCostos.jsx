@@ -156,7 +156,7 @@ function PartidaCard({ p, cats, updP, delP, onEdit, t }) {
 }
 
 // ── TabCostos — mobile card + desktop table ────────────────────────────────────
-export default function TabCostos({ partidas, cats, addPartida, updP, delP, addFromListino, listino, t }) {
+export default function TabCostos({ partidas = [], cats = [], addPartida, updP, delP, addFromListino, listino = [], t = {} }) {
   const [filterCat,  setFilterCat]  = useState(null);
   const [showExtras, setShowExtras] = useState(false);
   const [editingP,   setEditingP]   = useState(null); // partida in edit
@@ -174,7 +174,7 @@ export default function TabCostos({ partidas, cats, addPartida, updP, delP, addF
   const filtered = useMemo(() => {
     const list = filterCat ? partidas.filter(p => p.cat === filterCat) : [...partidas];
     // Ordina per categoria per separatori
-    return list.sort((a, b) => (a.cat || "").localeCompare(b.cat || ""));
+    return list.sort((a, b) => (String(a.cat || "")).localeCompare(String(b.cat || "")));
   }, [partidas, filterCat]);
 
   // Conteggi per categoria
