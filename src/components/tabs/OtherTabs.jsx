@@ -212,28 +212,58 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
       </div>
 
       {/* Print area */}
-      <div id="print-area" style={{ background: "white", padding: "28px 24px", maxWidth: 800, margin: "0 auto", borderRadius: 12, boxShadow: "0 1px 8px rgba(0,0,0,.08)" }}>
-        {/* Header empresa */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, paddingBottom: 14, borderBottom: "3px solid #1a365d" }}>
+      <div id="print-area" style={{ background: "white", padding: "28px 24px", maxWidth: 800, margin: "0 auto", borderRadius: 12, boxShadow: "0 1px 8px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+
+        {/* ── Watermark dinamico stato ── */}
+        <div style={{
+          position: "absolute", top: "42%", left: "50%",
+          transform: "translate(-50%,-50%) rotate(-35deg)",
+          fontSize: 80, fontWeight: 900, letterSpacing: 8,
+          color: ESTADO_COLORS[estado] || "#718096",
+          opacity: estado === "Borrador" ? 0.07 : 0.09,
+          pointerEvents: "none", userSelect: "none",
+          whiteSpace: "nowrap", zIndex: 0,
+          WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+        }}>
+          {(t[estado?.toLowerCase()] || estado || "").toUpperCase()}
+        </div>
+
+        {/* ── Banda accent superiore ── */}
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 7, background: `linear-gradient(90deg, ${pdf.colorPrimario}, ${ESTADO_COLORS[estado] || pdf.colorPrimario})`, borderRadius: "12px 12px 0 0", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }} />
+
+        {/* ── Header empresa ── */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, paddingBottom: 14, borderBottom: `2px solid ${pdf.colorPrimario}22`, marginTop: 8, position: "relative", zIndex: 1 }}>
           <div>
-            <img src={logoEffettivo} alt="" style={{ height: 46, marginBottom: 5, maxWidth: 180, objectFit: "contain" }} onError={e => { e.target.style.display = "none"; }} />
-            <div style={{ fontWeight: 800, fontSize: 17, color: "#1a365d" }}>{EMPRESA.nombre}</div>
-            <div style={{ fontSize: 10, color: "#718096" }}>RUT {EMPRESA.rut} · {EMPRESA.giro}</div>
+            <img src={logoEffettivo} alt="" style={{ height: 46, marginBottom: 6, maxWidth: 180, objectFit: "contain" }} onError={e => { e.target.style.display = "none"; }} />
+            <div style={{ fontWeight: 800, fontSize: 17, color: pdf.colorPrimario }}>{EMPRESA.nombre}</div>
+            <div style={{ fontSize: 10, color: "#718096", marginTop: 2 }}>RUT {EMPRESA.rut} · {EMPRESA.giro}</div>
             <div style={{ fontSize: 10, color: "#718096" }}>{EMPRESA.direccion}, {EMPRESA.ciudad} · 📞 {EMPRESA.telefono}</div>
             <div style={{ fontSize: 10, color: "#718096" }}>✉ {EMPRESA.email}</div>
           </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ background: ESTADO_BG[estado], color: ESTADO_COLORS[estado], padding: "5px 14px", borderRadius: 99, fontWeight: 700, fontSize: 12, marginBottom: 6, display: "inline-block" }}>
-              {t[estado?.toLowerCase()] || estado}
+          <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+            {/* Badge stato */}
+            <div style={{ background: ESTADO_BG[estado], color: ESTADO_COLORS[estado], padding: "5px 16px", borderRadius: 99, fontWeight: 800, fontSize: 12, border: `1.5px solid ${ESTADO_COLORS[estado]}44`, letterSpacing: 0.5 }}>
+              {(t[estado?.toLowerCase()] || estado || "").toUpperCase()}
             </div>
-            <div style={{ fontSize: 11, color: "#718096" }}>N° {currentId?.slice(-6) || "—"}</div>
-            <div style={{ fontSize: 11, color: "#718096" }}>{info.fecha}</div>
-            <div style={{ fontSize: 10, color: "#a0aec0" }}>{t.vence}: {venceDate}</div>
+            {/* Numero preventivo prominente */}
+            <div style={{ background: pdf.colorPrimario, color: "white", padding: "4px 14px", borderRadius: 7, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>
+              N° {currentId?.slice(-6)?.toUpperCase() || "——"}
+            </div>
+            <div style={{ fontSize: 11, color: "#4a5568" }}>📅 {info.fecha || new Date().toLocaleDateString("es-CL")}</div>
+            <div style={{ fontSize: 10, color: "#718096" }}>Vence: <strong>{venceDate}</strong></div>
+            {/* QR link firma/vista */}
+            {currentId && (
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=64x64&data=${encodeURIComponent(window.location.origin + "/firma/" + currentId)}`}
+                alt="QR"
+                style={{ width: 60, height: 60, borderRadius: 6, border: "1px solid #e2e8f0", marginTop: 4 }}
+              />
+            )}
           </div>
         </div>
 
         {/* Cliente + Obra */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 18 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 18, position: "relative", zIndex: 1 }}>
           <div style={{ background: "#f7fafc", borderRadius: 9, padding: "12px 14px" }}>
             <div style={{ fontSize: 10, color: "#718096", fontWeight: 700, marginBottom: 5, letterSpacing: .5 }}>CLIENTE / PROPIETARIO</div>
             <div style={{ fontWeight: 700, fontSize: 14, color: "#1a365d" }}>{info.cliente || "—"}</div>
@@ -249,7 +279,7 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
         </div>
 
         {/* Partidas por categoría */}
-        <div style={{ marginBottom: 18 }}>
+        <div style={{ marginBottom: 18, position: "relative", zIndex: 1 }}>
           {cats.map((cat, ci) => {
             const cv = getCatVis(cat);
             if (!cv.visible) return null;
@@ -289,7 +319,7 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
         </div>
 
         {/* Resumen financiero */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 18 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 18, position: "relative", zIndex: 1 }}>
           <div style={{ background: "#f7fafc", borderRadius: 9, padding: "12px 14px", fontSize: 11 }}>
             <div style={{ fontWeight: 700, marginBottom: 7, color: "#1a365d", fontSize: 12 }}>{t.desgloseFinanciero}</div>
             {[
@@ -382,19 +412,36 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
           </div>
         )}
 
-        {/* Pie de página */}
-        <div style={{ marginTop:24,paddingTop:12,borderTop:`1px solid ${pdf.colorPrimario}22`,display:"flex",justifyContent:"space-between",fontSize:9,color:"#a0aec0" }}>
-          <span>{EMPRESA.nombre} · {EMPRESA.email}</span>
-          <span>Documento generado el {new Date().toLocaleDateString("es-CL")}</span>
-        </div>
+        {/* ── Pie de página professionale ── */}
+        <div style={{ marginTop: 24, paddingTop: 12, borderTop: `2px solid ${pdf.colorPrimario}22`, position: "relative", zIndex: 1 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ fontSize: 9, color: "#a0aec0", lineHeight: 1.6 }}>
+              <div style={{ fontWeight: 700, color: "#718096", fontSize: 10 }}>{EMPRESA.nombre}</div>
+              <div>RUT {EMPRESA.rut} · {EMPRESA.giro}</div>
+              <div>{EMPRESA.direccion}, {EMPRESA.ciudad}</div>
+              <div>📞 {EMPRESA.telefono} · ✉ {EMPRESA.email}</div>
+            </div>
+            <div style={{ textAlign: "right", fontSize: 9, color: "#a0aec0", lineHeight: 1.6 }}>
+              <div>Documento N° {currentId?.slice(-6)?.toUpperCase() || "——"}</div>
+              <div>Generado el {new Date().toLocaleDateString("es-CL")}</div>
+              <div>Válido hasta: {venceDate}</div>
+              {isPro && <div style={{ color: pdf.colorPrimario, fontWeight: 600, marginTop: 2 }}>✓ Documento verificado</div>}
+            </div>
+          </div>
 
-      {/* Watermark Free */}
-      {!isPro && (
-        <div style={{ marginTop:28,paddingTop:14,borderTop:"1px solid #e2e8f0",display:"flex",alignItems:"center",justifyContent:"center",gap:10,opacity:.55 }}>
-          <img src={LOGO_URL} alt="Obra Nova" style={{ height:22,objectFit:"contain" }} onError={e=>{e.target.style.display="none";}} />
-          <span style={{ fontSize:10,color:"#a0aec0",fontWeight:600 }}>Generado con Obra Nova SPA · obranovaspa.cl</span>
+          {/* Watermark Free / branding Pro */}
+          {!isPro ? (
+            <div style={{ marginTop: 16, paddingTop: 10, borderTop: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, opacity: .5 }}>
+              <img src={LOGO_URL} alt="Obra Nova" style={{ height: 20, objectFit: "contain" }} onError={e => { e.target.style.display = "none"; }} />
+              <span style={{ fontSize: 10, color: "#a0aec0", fontWeight: 600 }}>Generado con Obra Nova SPA · obranovaspa.cl</span>
+            </div>
+          ) : (
+            <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, opacity: .4 }}>
+              <img src={LOGO_URL} alt="" style={{ height: 16, objectFit: "contain" }} onError={e => { e.target.style.display = "none"; }} />
+              <span style={{ fontSize: 9, color: "#a0aec0" }}>Obra Nova Pro</span>
+            </div>
+          )}
         </div>
-      )}
       </div>
     </div>
   );

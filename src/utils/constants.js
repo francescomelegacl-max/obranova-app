@@ -51,5 +51,7 @@ export const PRINT_STYLE = `
   #print-area { position:fixed;top:0;left:0;width:100%;background:white;padding:20px;box-sizing:border-box; }
   .no-print { display:none!important; }
   @page { margin:1.5cm; size:A4; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+  #print-area { position:fixed;top:0;left:0;width:100%;background:white !important;padding:20px;box-sizing:border-box;overflow:visible; }
 }
 `;
