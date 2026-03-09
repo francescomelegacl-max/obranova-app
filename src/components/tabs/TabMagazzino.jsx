@@ -1,9 +1,133 @@
 // ─── components/tabs/TabMagazzino.jsx ───────────────────────────────────────
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { MOVIMENTO_TYPES, MOVIMENTO_LABELS } from "../../hooks/useMagazzino";
 import { fmt } from "../../utils/helpers";
 import { DEFAULT_CATS } from "../../utils/constants";
 import { CAT_COLORS, catColor, CategoryChips, CategoryDivider, CategoryDividerMobile } from "../ui/CategoryFilters";
+import * as XLSX from "xlsx";
+
+// ── Parsing CSV/Excel → array di oggetti normalizzati ─────────────────────────
+function parseImportFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: "binary" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, { defval: "" });
+        // Normalizza nomi colonne (case insensitive, alias comuni)
+        const MAP = {
+          nombre: ["nombre", "nome", "name", "articulo", "artículo", "descripcion", "descripción", "item"],
+          categoria: ["categoria", "categoría", "category", "cat"],
+          unita: ["unita", "unidad", "unit", "unità", "ud"],
+          giacenza: ["giacenza", "stock", "cantidad", "qty", "quantity", "existencia"],
+          giacenzaMinima: ["giacenzaminima", "stockminimo", "mínimo", "minimo", "min"],
+          prezzo: ["prezzo", "precio", "price", "costo", "cost", "valor"],
+          fornitore: ["fornitore", "proveedor", "supplier"],
+          note: ["note", "notas", "notes", "nota", "observaciones"],
+        };
+        const colMap = {};
+        if (raw.length > 0) {
+          Object.keys(raw[0]).forEach(col => {
+            const colLow = col.toLowerCase().replace(/[\s_\-]/g, "");
+            Object.entries(MAP).forEach(([field, aliases]) => {
+              if (aliases.some(a => colLow.includes(a))) colMap[field] = col;
+            });
+          });
+        }
+        const items = raw
+          .filter(r => r[colMap.nombre])
+          .map(r => ({
+            nome:           String(r[colMap.nombre] || "").trim(),
+            categoria:      String(r[colMap.categoria] || DEFAULT_CATS[0]).trim() || DEFAULT_CATS[0],
+            unita:          String(r[colMap.unita] || "un").trim() || "un",
+            giacenza:       Number(r[colMap.giacenza]) || 0,
+            giacenzaMinima: Number(r[colMap.giacenzaMinima]) || 0,
+            prezzo:         Number(r[colMap.prezzo]) || 0,
+            fornitore:      String(r[colMap.fornitore] || "").trim(),
+            note:           String(r[colMap.note] || "").trim(),
+          }));
+        resolve(items);
+      } catch (err) { reject(err); }
+    };
+    reader.onerror = reject;
+    reader.readAsBinaryString(file);
+  });
+}
+
+// ── Modal preview import ──────────────────────────────────────────────────────
+function ModalImport({ items, cats, onConfirm, onClose }) {
+  const [selected, setSelected] = useState(() => new Set(items.map((_, i) => i)));
+  const toggleAll = () => setSelected(s => s.size === items.length ? new Set() : new Set(items.map((_, i) => i)));
+
+  return (
+    <div onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.65)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      <div style={{ background: "white", borderRadius: 16, width: "100%", maxWidth: 700, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,.35)" }}>
+        {/* Header */}
+        <div style={{ padding: "18px 24px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#1a365d" }}>📥 Vista previa — {items.length} artículos</div>
+            <div style={{ fontSize: 12, color: "#718096", marginTop: 2 }}>Selecciona los artículos a importar</div>
+          </div>
+          <button onClick={onClose} style={{ background: "#2d3748", border: "none", borderRadius: 8, cursor: "pointer", padding: "5px 12px", color: "white", fontWeight: 700 }}>✕</button>
+        </div>
+        {/* Tabella preview */}
+        <div style={{ overflow: "auto", flex: 1 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: "#f7fafc", position: "sticky", top: 0 }}>
+                <th style={{ padding: "8px 10px" }}>
+                  <input type="checkbox" checked={selected.size === items.length} onChange={toggleAll} />
+                </th>
+                {["Nombre", "Categoría", "Ud.", "Stock", "Precio/u", "Proveedor"].map(h => (
+                  <th key={h} style={{ padding: "8px 8px", textAlign: "left", fontWeight: 600, color: "#4a5568" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, i) => (
+                <tr key={i} style={{ background: selected.has(i) ? "#f0fff4" : "white", borderBottom: "1px solid #e2e8f0" }}>
+                  <td style={{ padding: "7px 10px", textAlign: "center" }}>
+                    <input type="checkbox" checked={selected.has(i)}
+                      onChange={() => setSelected(s => { const ns = new Set(s); ns.has(i) ? ns.delete(i) : ns.add(i); return ns; })} />
+                  </td>
+                  <td style={{ padding: "7px 8px", fontWeight: 600, color: "#1a365d" }}>{item.nome}</td>
+                  <td style={{ padding: "7px 8px" }}>
+                    <span style={{ padding: "1px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700,
+                      background: catColor(item.categoria).bg, color: catColor(item.categoria).text }}>
+                      {item.categoria}
+                    </span>
+                  </td>
+                  <td style={{ padding: "7px 8px", color: "#718096" }}>{item.unita}</td>
+                  <td style={{ padding: "7px 8px", fontWeight: 700, color: "#276749" }}>{item.giacenza}</td>
+                  <td style={{ padding: "7px 8px", color: "#2b6cb0" }}>{item.prezzo > 0 ? fmt(item.prezzo) : "—"}</td>
+                  <td style={{ padding: "7px 8px", color: "#718096" }}>{item.fornitore || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {/* Footer */}
+        <div style={{ padding: "14px 24px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 13, color: "#718096" }}>{selected.size} de {items.length} seleccionados</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={onClose}
+              style={{ padding: "9px 18px", background: "#f7fafc", border: "1px solid #e2e8f0", borderRadius: 9, cursor: "pointer", fontWeight: 600, color: "#4a5568" }}>
+              Cancelar
+            </button>
+            <button
+              onClick={() => { onConfirm(items.filter((_, i) => selected.has(i))); onClose(); }}
+              disabled={!selected.size}
+              style={{ padding: "9px 22px", background: selected.size ? "#1a365d" : "#a0aec0", color: "white", border: "none", borderRadius: 9, cursor: selected.size ? "pointer" : "default", fontWeight: 700, fontSize: 13 }}>
+              📥 Importar {selected.size > 0 ? `(${selected.size})` : ""}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const UNITA = ["un", "m²", "m³", "ml", "kg", "ton", "lt", "sacco", "pza", "gl", "hr"];
 
@@ -148,7 +272,7 @@ const ModalMovimento = ({ item, proyectos, onSave, onClose }) => {
 // ─── TabMagazzino principale ───────────────────────────────────────────────────
 export default function TabMagazzino({
   items = [], movimenti = [], proyectos = [],
-  onAddItem, onUpdateItem, onDeleteItem, onMovimento,
+  onSaveItem, onDeleteItem, onMovimento,
   loading = false, cats: propCats,
 }) {
   const [filterCat,     setFilterCat]     = useState(null);
@@ -156,8 +280,12 @@ export default function TabMagazzino({
   const [search,        setSearch]        = useState("");
   const [showMovimenti, setShowMovimenti] = useState(false);
   const [showForm,      setShowForm]      = useState(false);
-  const [editItem,      setEditItem]      = useState(null); // item da editare
+  const [editItem,      setEditItem]      = useState(null);
   const [movItem,       setMovItem]       = useState(null);
+  // 2.7 Import
+  const [importPreview, setImportPreview] = useState(null); // array items da preview
+  const [importing,     setImporting]     = useState(false);
+  const fileInputRef = useRef(null);
 
   const allCats = propCats || DEFAULT_CATS;
 
@@ -185,10 +313,11 @@ export default function TabMagazzino({
   }, [items]);
 
   const handleSaveForm = async (formData) => {
+    // FIX: App.jsx passa onSaveItem (useMagazzino.saveItem) che gestisce sia add che update
     if (editItem) {
-      await onUpdateItem?.(editItem.id, formData);
+      await onSaveItem?.({ ...formData, id: editItem.id });
     } else {
-      await onAddItem?.(formData);
+      await onSaveItem?.(formData);
     }
     setShowForm(false);
     setEditItem(null);
@@ -202,6 +331,31 @@ export default function TabMagazzino({
   const handleCloseForm = () => {
     setShowForm(false);
     setEditItem(null);
+  };
+
+  // ── 2.7 Import CSV/Excel ──────────────────────────────────────────────────
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ""; // reset per permettere ricaricamento stesso file
+    try {
+      const parsed = await parseImportFile(file);
+      if (!parsed.length) { alert("Nessun articolo trovato nel file. Verifica le intestazioni delle colonne."); return; }
+      setImportPreview(parsed);
+    } catch (err) {
+      alert("Errore nel parsing del file: " + err.message);
+    }
+  };
+
+  const handleImportConfirm = async (selectedItems) => {
+    setImporting(true);
+    try {
+      for (const item of selectedItems) {
+        await onSaveItem?.(item);
+      }
+    } finally {
+      setImporting(false);
+    }
   };
 
   // ── Render righe raggruppate per categoria ────────────────────────────────
@@ -282,6 +436,21 @@ export default function TabMagazzino({
           style={{ padding: "9px 18px", background: "#1a365d", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
           ➕ Nuevo artículo
         </button>
+        {/* 2.7 Import CSV/Excel */}
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={importing}
+          title="Importar inventario desde CSV o Excel"
+          style={{ padding: "9px 14px", background: importing ? "#a0aec0" : "#2b6cb0", color: "white", border: "none", borderRadius: 10, cursor: importing ? "default" : "pointer", fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+          📥 {importing ? "Importando..." : "Importar CSV/Excel"}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          style={{ display: "none" }}
+          onChange={handleFileSelect}
+        />
         <button onClick={() => setShowMovimenti(v => !v)}
           style={{ padding: "9px 14px", background: showMovimenti ? "#2b6cb0" : "#f0f4f8", color: showMovimenti ? "white" : "#718096", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 600, fontSize: 12 }}>
           🔄 Movimientos
@@ -380,6 +549,15 @@ export default function TabMagazzino({
           proyectos={proyectos}
           onSave={(data) => onMovimento?.(movItem, data)}
           onClose={() => setMovItem(null)}
+        />
+      )}
+      {/* 2.7 Modal preview import */}
+      {importPreview && (
+        <ModalImport
+          items={importPreview}
+          cats={allCats}
+          onConfirm={handleImportConfirm}
+          onClose={() => setImportPreview(null)}
         />
       )}
     </div>

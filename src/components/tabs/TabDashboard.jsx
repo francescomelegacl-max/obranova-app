@@ -69,7 +69,7 @@ function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, value, name }) {
   );
 }
 
-export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProject, onNewProject }) {
+export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProject, onNewProject, plan, proyectosRestantes, onUpgrade }) {
 
   const [activeSlice, setActiveSlice] = useState(null);
 
@@ -179,7 +179,62 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-      {/* KPI Cards */}
+      {/* 4.1 Banner piano Free */}
+      {plan === "free" && (
+        <div style={{
+          background: "linear-gradient(135deg,#fffaf0,#fefcbf)",
+          border: "1px solid #f6e05e", borderRadius: 12,
+          padding: "12px 16px", display: "flex", alignItems: "center",
+          justifyContent: "space-between", flexWrap: "wrap", gap: 10,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 22 }}>🔓</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#744210" }}>
+                Plan Free — {proyectosRestantes > 0
+                  ? `Te quedan ${proyectosRestantes} de 3 proyectos activos`
+                  : "Has alcanzado el límite de 3 proyectos activos"}
+              </div>
+              <div style={{ fontSize: 11, color: "#975a16" }}>
+                Actualiza a Pro para proyectos ilimitados, Excel, firma digital y más.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onUpgrade}
+            style={{
+              padding: "8px 18px", background: "linear-gradient(135deg,#2b6cb0,#553c9a)",
+              color: "white", border: "none", borderRadius: 9,
+              cursor: "pointer", fontWeight: 700, fontSize: 12, flexShrink: 0,
+            }}
+          >
+            ⚡ Ver Pro →
+          </button>
+        </div>
+      )}
+
+      {/* 4.1 Alert limite progetti raggiunto */}
+      {plan === "free" && proyectosRestantes === 0 && (
+        <div style={{
+          background: "#fff5f5", border: "1px solid #fed7d7",
+          borderRadius: 12, padding: "12px 16px",
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <span style={{ fontSize: 22 }}>🚫</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#c53030" }}>
+              Límite de proyectos alcanzado
+            </div>
+            <div style={{ fontSize: 11, color: "#9b2c2c" }}>
+              Tienes 3 proyectos activos. Finaliza uno o actualiza a Pro para continuar.
+            </div>
+          </div>
+          <button onClick={onUpgrade}
+            style={{ padding: "8px 14px", background: "#c53030", color: "white", border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
+            Actualizar →
+          </button>
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
         {kpis.map(k => (
           <div key={k.label} style={{

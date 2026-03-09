@@ -351,14 +351,32 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
           </div>
         )}
 
-        {/* Firma digitale */}
+        {/* Firma digitale — 2.9: mostra immagine firma + campi corretti */}
         {pdf.mostraFirma && firme && firme.filter(f => f.stato==="firmato").length > 0 && (
-          <div className="print-block" style={{ marginBottom:16,padding:"12px 16px",background:"#f0fff4",borderRadius:9,border:"1px solid #9ae6b4" }}>
-            <div style={{ fontWeight:700,fontSize:12,color:"#276749",marginBottom:8 }}>✍️ Firma digital</div>
+          <div className="print-block" style={{ marginBottom:16,padding:"14px 16px",background:"#f0fff4",borderRadius:9,border:"1px solid #9ae6b4" }}>
+            <div style={{ fontWeight:700,fontSize:12,color:"#276749",marginBottom:10 }}>✍️ Firma digital del cliente</div>
             {firme.filter(f => f.stato==="firmato").map((f,i) => (
-              <div key={i} style={{ fontSize:11,color:"#2d3748",marginBottom:4 }}>
-                <strong>{f.nombre||"Cliente"}</strong> firmó el {f.firmadoAt?.slice(0,10)||"—"}
-                {f.ip && <span style={{ color:"#718096",marginLeft:6 }}>· IP: {f.ip}</span>}
+              <div key={i} style={{ display:"flex",alignItems:"flex-start",gap:16,flexWrap:"wrap" }}>
+                {/* Immagine firma */}
+                {f.firmaImmagine && (
+                  <div style={{ border:"1px solid #9ae6b4",borderRadius:8,padding:"6px 12px",background:"white",flexShrink:0 }}>
+                    <img
+                      src={f.firmaImmagine}
+                      alt="Firma cliente"
+                      style={{ height:64,maxWidth:220,objectFit:"contain",display:"block" }}
+                    />
+                  </div>
+                )}
+                {/* Dati firma */}
+                <div style={{ fontSize:11,color:"#2d3748",display:"flex",flexDirection:"column",gap:3,justifyContent:"center" }}>
+                  <div><strong style={{ color:"#276749" }}>{f.firmaNome || f.nombre || "Cliente"}</strong></div>
+                  <div style={{ color:"#718096" }}>
+                    Firmado el {f.firmaData
+                      ? new Date(f.firmaData).toLocaleDateString("es-CL",{day:"2-digit",month:"long",year:"numeric"})
+                      : f.firmadoAt?.slice(0,10) || "—"}
+                  </div>
+                  {f.firmaIP && <div style={{ color:"#a0aec0",fontSize:10 }}>IP: {f.firmaIP}</div>}
+                </div>
               </div>
             ))}
           </div>

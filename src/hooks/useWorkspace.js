@@ -7,7 +7,7 @@
 
 import { useState, useCallback } from "react";
 import {
-  doc, setDoc, getDoc, collection, getDocs,
+  doc, setDoc, getDoc, collection, collectionGroup, getDocs,
   deleteDoc, updateDoc, query, where
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
@@ -44,17 +44,20 @@ export function useWorkspace({ onToast }) {
   const userEmail = () => auth.currentUser?.email;
 
   // ── Carica tutti i workspace a cui appartiene l'utente ────────────────────
+  // FIX 1.3: usa collectionGroup('members') + where(uid) invece di O(n) loop su tutti i workspace
   const loadWorkspaces = useCallback(async () => {
     const u = uid(); if (!u) return [];
     setLoadingWS(true);
     try {
-      // Cerca workspace dove l'utente è membro
-      const snap = await getDocs(collection(db, "workspaces"));
+      const q = query(collectionGroup(db, "members"), where("uid", "==", u));
+      const snap = await getDocs(q);
       const list = [];
-      for (const d of snap.docs) {
-        const memberDoc = await getDoc(doc(db, "workspaces", d.id, "members", u));
-        if (memberDoc.exists()) {
-          list.push({ id: d.id, ...d.data(), myRole: memberDoc.data().role });
+      for (const memberDoc of snap.docs) {
+        // Il path è workspaces/{workspaceId}/members/{uid}
+        const wsId = memberDoc.ref.parent.parent.id;
+        const wsDoc = await getDoc(doc(db, "workspaces", wsId));
+        if (wsDoc.exists()) {
+          list.push({ id: wsId, ...wsDoc.data(), myRole: memberDoc.data().role });
         }
       }
       setWorkspaces(list);
@@ -96,8 +99,9 @@ export function useWorkspace({ onToast }) {
         plan: "free", // free | pro | team | enterprise
       };
       await setDoc(ref, wsData);
-      // Aggiunge il creatore come owner
+      // Aggiunge il creatore come owner — FIX 1.3: include campo uid per query collectionGroup
       await setDoc(doc(db, "workspaces", ref.id, "members", u), {
+        uid: u,
         role:        ROLES.OWNER,
         email:       userEmail() || "",
         displayName: auth.currentUser?.displayName || userEmail() || "Titolare",
@@ -141,18 +145,19 @@ export function useWorkspace({ onToast }) {
   }, [workspace, onToast]);
 
   // ── Carica inviti pendenti per l'utente corrente ──────────────────────────
+  // FIX 1.2: usa query con where() invece di getDocs globale su tutta la collection
   const loadPendingInvites = useCallback(async () => {
     const email = userEmail()?.toLowerCase();
     if (!email) return [];
     try {
-      const snap = await getDocs(collection(db, "invites"));
+      const q = query(
+        collection(db, "invites"),
+        where("invitedEmail", "==", email),
+        where("status", "==", "pending")
+      );
+      const snap = await getDocs(q);
       const list = [];
-      snap.forEach(d => {
-        const data = d.data();
-        if (data.invitedEmail === email && data.status === "pending") {
-          list.push({ id: d.id, ...data });
-        }
-      });
+      snap.forEach(d => list.push({ id: d.id, ...d.data() }));
       return list;
     } catch (e) {
       console.error("loadPendingInvites:", e);
@@ -164,8 +169,9 @@ export function useWorkspace({ onToast }) {
   const acceptInvite = useCallback(async (invite) => {
     const u = uid(); if (!u) return false;
     try {
-      // Aggiunge l'utente come membro del workspace
+      // Aggiunge l'utente come membro del workspace — FIX 1.3: include campo uid per query collectionGroup
       await setDoc(doc(db, "workspaces", invite.workspaceId, "members", u), {
+        uid: u,
         role:        invite.role,
         email:       userEmail() || "",
         displayName: auth.currentUser?.displayName || userEmail() || "",

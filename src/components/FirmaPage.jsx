@@ -3,7 +3,7 @@
 // Il cliente vede il preventivo, può firmare con dito/mouse e accettare o rifiutare.
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, query, collectionGroup, where, getDocs } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { LOGO_URL } from "../utils/constants";
 import { fmt } from "../utils/helpers";
@@ -123,20 +123,14 @@ export default function PaginaFirma({ token }) {
     if (!token) { setErrore("Token non valido"); setLoading(false); return; }
     const load = async () => {
       try {
-        // Il token è salvato in tokens_firma/{token} con workspaceId e proyectoId
-        const tokenRef  = doc(db, "tokens_firma", token);
-        const tokenSnap = await getDoc(tokenRef);
-        if (!tokenSnap.exists()) { setErrore("Link non trovato o scaduto"); setLoading(false); return; }
+        // FIX 1.5/2.9: cerca il token con collectionGroup('firme') — tokens_firma non esiste
+        const q = query(collectionGroup(db, "firme"), where("token", "==", token));
+        const snap = await getDocs(q);
+        if (snap.empty) { setErrore("Link non trovato o scaduto"); setLoading(false); return; }
 
-        const tokenData = tokenSnap.data();
-        const { workspaceId, proyectoId } = tokenData;
-
-        // Carica firma
-        const firmaRef  = doc(db, `workspaces/${workspaceId}/firme/${token}`);
-        const firmaSnap = await getDoc(firmaRef);
-        if (!firmaSnap.exists()) { setErrore("Link non valido"); setLoading(false); return; }
-
-        const firmaData = { id: firmaSnap.id, ...firmaSnap.data() };
+        const firmaDoc  = snap.docs[0];
+        const firmaData = { id: firmaDoc.id, ...firmaDoc.data() };
+        const { workspaceId, proyectoId } = firmaData;
 
         // Controlla scadenza
         if (firmaData.scadenzaAt && new Date(firmaData.scadenzaAt) < new Date()) {

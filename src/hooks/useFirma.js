@@ -2,7 +2,7 @@
 // Gestisce la creazione di link di firma e il salvataggio delle firme.
 
 import { useState, useCallback } from "react";
-import { doc, setDoc, getDoc, collection, getDocs, updateDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, collectionGroup, getDocs, updateDoc, query, where } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
 
 export const FIRMA_STATI = {
@@ -84,25 +84,22 @@ export function useFirma({ workspaceId, onToast }) {
   }, [workspaceId, base]);
 
   // ── Carica dati firma pubblica (senza auth) ───────────────────────────────
+  // FIX 1.5: cerca il token direttamente con collectionGroup('firme')
+  // eliminando la dipendenza dalla collection tokens_firma/ che non esiste in produzione
   const loadFirmaPubblica = useCallback(async (token) => {
     try {
-      // Cerca il token in tutti i workspace (lettura pubblica tramite token)
-      // Il token è univoco e funge da chiave di accesso
-      const ref = doc(db, `tokens_firma/${token}`);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        const data = snap.data();
-        // Leggi il progetto dal workspace
-        const proyRef = doc(db, `workspaces/${data.workspaceId}/proyectos/${data.proyectoId}`);
-        const proySnap = await getDoc(proyRef);
-        const firmaRef = doc(db, `workspaces/${data.workspaceId}/firme/${token}`);
-        const firmaSnap = await getDoc(firmaRef);
-        return {
-          firma:    firmaSnap.exists() ? { id: firmaSnap.id, ...firmaSnap.data() } : null,
-          proyecto: proySnap.exists() ? { id: proySnap.id, ...proySnap.data() } : null,
-        };
-      }
-      return null;
+      const q = query(collectionGroup(db, "firme"), where("token", "==", token));
+      const snap = await getDocs(q);
+      if (snap.empty) return null;
+      const firmaDoc = snap.docs[0];
+      const firmaData = firmaDoc.data();
+      // Leggi il progetto dallo stesso workspace
+      const proyRef = doc(db, `workspaces/${firmaData.workspaceId}/proyectos/${firmaData.proyectoId}`);
+      const proySnap = await getDoc(proyRef);
+      return {
+        firma:    { id: firmaDoc.id, ...firmaData },
+        proyecto: proySnap.exists() ? { id: proySnap.id, ...proySnap.data() } : null,
+      };
     } catch (e) { console.error("loadFirmaPubblica:", e); return null; }
   }, []);
 

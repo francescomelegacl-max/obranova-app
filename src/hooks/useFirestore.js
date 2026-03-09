@@ -130,13 +130,14 @@ export function useFirestore({ onToast, workspaceId }) {
     }
   }, [basePath, onToast]);
 
-  // Aggiorna il prezzo di acquisto di un articolo del listino (importato da ML)
-  const updatePrezzoCompra = useCallback(async (id, prezzo) => {
+  // FIX 1.6: rinominata da updatePrezzoCompra (dead code MercadoLibre) a updatePrezzoManuale
+  // Usare per aggiornamento manuale del prezzo di acquisto da TabListino
+  const updatePrezzoManuale = useCallback(async (id, prezzo) => {
     const base = basePath(); if (!base) return;
     try {
-      await updateDoc(doc(db, base, "listino", id), { precioCompra: prezzo, mlUpdatedAt: new Date().toISOString() });
+      await updateDoc(doc(db, base, "listino", id), { precioCompra: prezzo, updatedAt: new Date().toISOString() });
       setListino(l => l.map(x => x.id === id ? { ...x, precioCompra: prezzo } : x));
-      onToast("✅ Prezzo aggiornato da MercadoLibre");
+      onToast("✅ Prezzo aggiornato");
     } catch (e) {
       onToast("⚠️ Errore: " + e.message);
     }
@@ -168,7 +169,7 @@ export function useFirestore({ onToast, workspaceId }) {
     proyectos, listino, fotosMap, cats, guardando,
     loadProyectos, saveProyecto, newProyecto, deleteProyecto,
     loadListino, saveListinoItem, deleteListinoItem,
-    updateGiacenza, updatePrezzoCompra,
+    updateGiacenza, updatePrezzoManuale,
     loadCats, addCat, setCats,
   };
 }

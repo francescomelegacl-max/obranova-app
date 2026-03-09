@@ -9,8 +9,6 @@ import { useWorkspace }                     from "./hooks/useWorkspace";
 import { useMagazzino }                     from "./hooks/useMagazzino";
 import { useFirma }                         from "./hooks/useFirma";
 import { useFatture }                       from "./hooks/useFatture";
-import { usePlan }                          from "./hooks/usePlan";
-import PaywallModal                         from "./components/PaywallModal";
 
 import T                                    from "./i18n/translations";
 import { calcTotals, exportCSV }            from "./utils/helpers";
@@ -24,6 +22,8 @@ import ModalFotos                           from "./components/ModalFotos";
 import ModalOnboarding                      from "./components/ModalOnboarding";
 import RicercaGlobale                       from "./components/RicercaGlobale";
 import ErrorBoundary                        from "./components/ErrorBoundary";
+import PaywallModal                         from "./components/PaywallModal";
+import { usePlan }                          from "./hooks/usePlan";
 
 // ── WhatsApp inline (zero dipendenze esterne) ─────────────────────────────────
 const WA_ESTADOS = new Set(["Enviado","Aceptado","Rechazado","En obra","Finalizado"]);
@@ -74,6 +74,27 @@ const TabLoader = () => (
   </div>
 );
 
+// 4.1: Schermata inline per tab bloccati nel piano Free
+const PaywallTab = ({ feature, onUpgrade }) => {
+  const ICONS = { fatture:"🧾", agenda:"📅", templates:"📂", firma:"✍️" };
+  const NAMES = { fatture:"Facturas", agenda:"Agenda", templates:"Templates", firma:"Firma digital" };
+  return (
+    <div style={{ display:"flex",alignItems:"center",justifyContent:"center",minHeight:300,padding:24 }}>
+      <div style={{ textAlign:"center",maxWidth:320 }}>
+        <div style={{ fontSize:52,marginBottom:12 }}>{ICONS[feature]||"⚡"}</div>
+        <div style={{ fontSize:18,fontWeight:800,color:"#1a365d",marginBottom:8 }}>{NAMES[feature]||feature}</div>
+        <div style={{ fontSize:13,color:"#718096",marginBottom:20,lineHeight:1.5 }}>
+          Esta función está disponible en el plan Pro.<br/>Actualiza para desbloquearla.
+        </div>
+        <button onClick={onUpgrade}
+          style={{ padding:"12px 28px",background:"linear-gradient(135deg,#2b6cb0,#553c9a)",color:"white",border:"none",borderRadius:12,cursor:"pointer",fontWeight:800,fontSize:14 }}>
+          ⚡ Ver planes →
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [user,           setUser]           = useState(null);
@@ -99,11 +120,6 @@ export default function App() {
     inviteMember, loadPendingInvites, acceptInvite, rejectInvite,
     changeMemberRole, removeMember, updateWorkspaceName, can,
   } = useWorkspace({ onToast: showToast });
-
-  const { canPlan, plan } = usePlan({ workspace });
-  const [paywallFeature, setPaywallFeature] = useState(null);
-  const openPaywall  = useCallback((feature) => setPaywallFeature(feature), []);
-  const closePaywall = useCallback(() => setPaywallFeature(null), []);
 
   const {
     proyectos, listino, fotosMap, cats, guardando,
@@ -186,14 +202,16 @@ export default function App() {
     return () => clearTimeout(saveTimer.current);
   }, [proy]); // eslint-disable-line
 
-  const handleNewProject     = async () => { const id = await newProyecto(); if (id) { dispatch({ type:"NEW_PROJECT", payload:id }); setTab(2); } };
+  const handleNewProject = async () => {
+    // 4.1: blocca creazione se limite Free raggiunto
+    if (!canCreateProyecto()) { showPaywall("maxProyectos"); return; }
+    const id = await newProyecto(); if (id) { dispatch({ type:"NEW_PROJECT", payload:id }); setTab(2); }
+  };
   const handleSaveManual     = () => saveProyecto(proy.currentId, proy, true);
   const handleOpenProject    = (p) => { loadProject(p); setTab(2); };
   const handleOpenPDF        = (p) => { loadProject(p); setTab(7); };
   const handleDeleteProject  = async (id) => { const d = await deleteProyecto(id); if (d && id===proy.currentId) dispatch({ type:"NEW_PROJECT", payload:null }); };
   const handleAddFromListino = (item) => { addFromListino(item); setTab(3); };
-
-  const totals = useMemo(() => calcTotals(proy.partidas, proy.pct), [proy.partidas, proy.pct]);
 
   // ── 3.1: WA automatico al cambio stato ───────────────────────────────────
   // Wrappa setEstado: aggiorna lo stato e, se lo stato ha un template WA,
@@ -235,6 +253,15 @@ export default function App() {
   };
   const handleRejectInvite    = async (id) => { await rejectInvite(id); setPendingInvites(p => p.filter(x => x.id !== id)); };
   const handleSelectWorkspace = async (ws) => { await selectWorkspace(ws); setTab(0); };
+
+  const totals = useMemo(() => calcTotals(proy.partidas, proy.pct), [proy.partidas, proy.pct]);
+
+  // ── 4.1 Piano e limiti ────────────────────────────────────────────────────
+  const { plan, isPro, canUse, canCreateProyecto, proyectosRestantes, activeCount } = usePlan(workspace, proyectos);
+  const [paywallFeature, setPaywallFeature] = useState(null); // null | nome feature bloccata
+  const showPaywall = (feature) => setPaywallFeature(feature);
+  const hidePaywall = () => setPaywallFeature(null);
+  const goToUpgrade = () => { setTab(15); hidePaywall(); };
 
   // ── Detect mobile — deve stare PRIMA dei return condizionali ─────────────
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768);
@@ -305,13 +332,6 @@ export default function App() {
       <style>{PRINT_STYLE}</style>
 
       <Toast msg={toast} />
-      {paywallFeature && (
-        <PaywallModal
-          feature={paywallFeature}
-          onClose={closePaywall}
-          onGoToPiani={() => { closePaywall(); setTab(15); }}
-        />
-      )}
       {showOnboarding  && <ModalOnboarding t={t} onClose={() => setShowOnboarding(false)} />}
       {showRicerca     && <RicercaGlobale proyectos={proyectos} t={t} onOpenProject={(p) => { handleOpenProject(p); }} onClose={() => setShowRicerca(false)} />}
       {showAddListino  && <ModalListino onSave={saveListinoItem} onClose={() => setShowAddListino(false)} t={t} cats={cats} />}
@@ -538,19 +558,21 @@ export default function App() {
       <main style={{ padding: isMobile ? 10 : 14, maxWidth:1200, margin:"0 auto" }}>
         <Suspense fallback={<TabLoader />}>
           <ErrorBoundary label={TABS_DEF[tab]?.label}>
-            {tab===0  && <TabDashboard proyectos={proyectos} partidas={proy.partidas} cats={cats} t={t} onOpenProject={handleOpenProject} onNewProject={handleNewProject} />}
-            {tab===1  && <TabProyectos proyectos={proyectos} currentId={proy.currentId} onLoad={handleOpenProject} onDelete={handleDeleteProject} onPDF={handleOpenPDF} t={t} canPlan={canPlan} onPaywall={openPaywall} />}
+            {tab===0  && <TabDashboard proyectos={proyectos} partidas={proy.partidas} cats={cats} t={t} onOpenProject={handleOpenProject} onNewProject={handleNewProject} plan={plan} proyectosRestantes={proyectosRestantes} onUpgrade={goToUpgrade} />}
+            {tab===1  && <TabProyectos proyectos={proyectos} currentId={proy.currentId} onLoad={handleOpenProject} onDelete={handleDeleteProject} onPDF={handleOpenPDF} t={t} />}
             {tab===2  && <TabProyecto info={proy.info} setInfo={setInfo} pct={proy.pct} setPct={setPct} estado={proy.estado} setEstado={handleSetEstado} iva={proy.iva} setIva={setIva} validez={proy.validez} setValidez={setValidez} condPago={proy.condPago} setCondPago={setCondPago} condPagoPersonalizado={proy.condPagoPersonalizado} setCondPagoPersonalizado={setCondPagoPersonalizado} cuotas={proy.cuotas} setCuotas={setCuotas} partidas={proy.partidas} t={t} />}
-            {tab===3  && <TabCostos partidas={proy.partidas} cats={cats} addPartida={addPartida} updP={updP} delP={delP} addFromListino={handleAddFromListino} listino={listino} t={t} workspaceId={workspace?.id} lang={lang} info={proy.info} pct={proy.pct} condPago={proy.condPago} condPagoPersonalizado={proy.condPagoPersonalizado} cuotas={proy.cuotas} iva={proy.iva} onApplyTemplate={(tpl) => { tpl.partidas?.forEach(p => addFromListino({ ...p, id: undefined })); if (tpl.pct) dispatch({ type:"SET_PCT", payload:tpl.pct }); }} canPlan={canPlan} onPaywall={openPaywall} />}
+            {tab===3  && <TabCostos partidas={proy.partidas} cats={cats} addPartida={addPartida} updP={updP} delP={delP} addFromListino={handleAddFromListino} listino={listino} t={t} workspaceId={workspace?.id} lang={lang} info={proy.info} pct={proy.pct} condPago={proy.condPago} condPagoPersonalizado={proy.condPagoPersonalizado} cuotas={proy.cuotas} iva={proy.iva}
+              onApplyTemplate={(tpl) => { tpl.partidas?.forEach(p => addFromListino({ ...p, id: undefined })); if (tpl.pct) dispatch({ type:"SET_PCT", payload:tpl.pct }); }}
+              canExcel={canUse("exportExcel")} canTemplates={canUse("templates")} onPaywall={showPaywall} />}
             {tab===4  && <TabCalcolatore listino={listino} addPartida={addFromListino} cats={cats} onToast={showToast} />}
             {tab===5  && <TabKitMateriali kits={kits} cargando={cargandoKits} onSaveKit={saveKit} onDeleteKit={deleteKit} onImportarPredefinito={importarKitPredefinito} addPartida={addFromListino} cats={cats} onToast={showToast} />}
             {tab===6  && <TabResumen partidas={proy.partidas} pct={proy.pct} cats={cats} iva={proy.iva} t={t} />}
-            {tab===7  && <TabVistaCliente info={proy.info} partidas={proy.partidas} pct={proy.pct} cats={cats} catVis={proy.catVis} getCatVis={getCatVis} setCatVisKey={setCatVisKey} iva={proy.iva} estado={proy.estado} currentId={proy.currentId} validez={proy.validez} t={t} onInviaFirma={handleInviaFirma} firme={firme} plan={workspace?.plan} />}
+            {tab===7  && <TabVistaCliente info={proy.info} partidas={proy.partidas} pct={proy.pct} cats={cats} catVis={proy.catVis} getCatVis={getCatVis} setCatVisKey={setCatVisKey} iva={proy.iva} estado={proy.estado} currentId={proy.currentId} validez={proy.validez} t={t} onInviaFirma={canUse("firma") ? handleInviaFirma : () => showPaywall("firma")} firme={firme} plan={workspace?.plan} />}
             {tab===8  && <TabListino listino={listino} cats={cats} catColors={CAT_COLORS} newCatName={newCatName} setNewCatName={setNewCatName} onAddCat={() => { addCat(newCatName,t); setNewCatName(""); }} onDeleteItem={deleteListinoItem} onAddFromListino={handleAddFromListino} onOpenAddModal={() => setShowAddListino(true)} DEFAULT_CATS={DEFAULT_CATS} t={t} />}
             {tab===9  && <TabMagazzino items={magItems} movimenti={movimenti} itemsInAlert={itemsInAlert} loading={magLoading} cats={cats} proyectos={proyectos} onSaveItem={saveMagItem} onDeleteItem={deleteMagItem} onMovimento={registraMovimento} />}
-            {tab===10 && <TabFatture proyectos={proyectos} fatture={fatture} onCreaFattura={creaFattura} onTogglePagata={togglePagata} onEliminaFattura={eliminaFattura} />}
-            {tab===11 && <TabStorico proyectos={proyectos} t={t} canPlan={canPlan} onPaywall={openPaywall} />}
-            {tab===12 && <TabAgenda proyectos={proyectos} fatture={fatture} onOpenProject={handleOpenProject} />}
+            {tab===10 && (canUse("fatture") ? <TabFatture proyectos={proyectos} fatture={fatture} onCreaFattura={creaFattura} onTogglePagata={togglePagata} onEliminaFattura={eliminaFattura} /> : <PaywallTab feature="fatture" onUpgrade={goToUpgrade} onPaywall={showPaywall} />)}
+            {tab===11 && <TabStorico proyectos={proyectos} t={t} />}
+            {tab===12 && (canUse("agenda") ? <TabAgenda proyectos={proyectos} fatture={fatture} onOpenProject={handleOpenProject} /> : <PaywallTab feature="agenda" onUpgrade={goToUpgrade} onPaywall={showPaywall} />)}
             {tab===13 && <TabSII proyectos={proyectos} workspaceId={workspace?.id} t={t} onToast={showToast} />}
             {tab===14 && <TabSettings workspace={workspace} members={members} myRole={myRole} can={can} onInvite={(email,role) => inviteMember(email,role,workspace.id)} onChangeRole={changeMemberRole} onRemoveMember={removeMember} onUpdateName={updateWorkspaceName} onGoToPiani={() => setTab(15)} />}
             {tab===15 && <TabPiani workspace={workspace} />}
@@ -560,6 +582,14 @@ export default function App() {
       </main>
 
       {/* ── BOTTOM NAV MOBILE ───────────────────────────────────────────────── */}
+      {/* 4.1 PaywallModal */}
+      {paywallFeature && (
+        <PaywallModal
+          feature={paywallFeature}
+          onUpgrade={goToUpgrade}
+          onClose={hidePaywall}
+        />
+      )}
       {isMobile && (
         <nav className="no-print" style={{
           position:"fixed",bottom:0,left:0,right:0,
