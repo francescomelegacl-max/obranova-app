@@ -3,6 +3,7 @@
 // invece di far crashare tutta l'app.
 
 import { Component } from "react";
+import * as Sentry from "@sentry/react";
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -15,7 +16,8 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // In produzione si potrebbe loggare su Sentry o simile
+    // Loga automaticamente su Sentry in produzione
+    Sentry.captureException(error, { extra: info });
     console.error("Tab error:", error, info);
   }
 
