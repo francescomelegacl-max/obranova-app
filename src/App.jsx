@@ -10,7 +10,6 @@ import { useMagazzino }                     from "./hooks/useMagazzino";
 import { useFirma }                         from "./hooks/useFirma";
 import { useFatture }                       from "./hooks/useFatture";
 import { usePlan }                          from "./hooks/usePlan";
-import { useNotificaciones }               from "./hooks/useNotificaciones";
 import PaywallModal                         from "./components/PaywallModal";
 
 import T                                    from "./i18n/translations";
@@ -99,14 +98,13 @@ export default function App() {
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(""), 3500); }, []);
 
   const {
-    workspace, workspaces, members, myRole,
+    workspace, workspaces, members, myRole, loadingWS,
     loadWorkspaces, selectWorkspace, createWorkspace,
     inviteMember, loadPendingInvites, acceptInvite, rejectInvite,
     changeMemberRole, removeMember, updateWorkspaceName, can,
   } = useWorkspace({ onToast: showToast });
 
   const { canPlan, plan, isPro, isTrialActive, trialDaysLeft } = usePlan({ workspace });
-  useNotificaciones({ proyectos, workspace });
   const [paywallFeature, setPaywallFeature] = useState(null);
   const openPaywall  = useCallback((feature) => setPaywallFeature(feature), []);
   const closePaywall = useCallback(() => setPaywallFeature(null), []);
@@ -273,8 +271,25 @@ export default function App() {
     { icon:"⚙️", label: t.impostazioni || "Ajustes"   },  // 14
     { icon:"💎", label: "Planes"                       },  // 15
     { icon:"❓", label: t.tabHelp                      },  // 16
-    ...(ADMIN_EMAILS.has(user?.email) ? [{ icon:"🛠️", label: "Admin" }] : []),  // 17
-  ], [t, user?.email]);
+    { icon:"🛠️", label: "Admin", adminOnly: true },  // 17
+  ], [t]);
+
+  // 2.11 Swipe tra tab su mobile — deve stare PRIMA dei return condizionali
+  const swipeRef = useRef({ startX: null, startY: null });
+  const handleTouchStart = useCallback((e) => {
+    swipeRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY };
+  }, []);
+  const handleTouchEnd = useCallback((e) => {
+    if (!isMobile) return;
+    const dx = e.changedTouches[0].clientX - swipeRef.current.startX;
+    const dy = e.changedTouches[0].clientY - swipeRef.current.startY;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    const swipeableTabs = [0, 1, 2, 3];
+    const currIdx = swipeableTabs.indexOf(tab);
+    if (currIdx === -1) return;
+    if (dx < 0 && currIdx < swipeableTabs.length - 1) setTab(swipeableTabs[currIdx + 1]);
+    if (dx > 0 && currIdx > 0) setTab(swipeableTabs[currIdx - 1]);
+  }, [isMobile, tab]);
 
   // ── Pagina pubblica firma ─────────────────────────────────────────────────
   if (firmaToken) return (
@@ -289,6 +304,11 @@ export default function App() {
     </div>
   );
   if (!user) return <LoginScreen onLogin={u => setUser(u)} />;
+  if (loadingWS) return (
+    <div style={{ minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#1a365d",color:"white",fontSize:18 }}>
+      Cargando...
+    </div>
+  );
   if (!workspace) return (
     <WorkspaceScreen
       workspaces={workspaces} pendingInvites={pendingInvites}
@@ -306,23 +326,7 @@ export default function App() {
     { idx: 3,  icon: "🏗️", label: t.costos || "Costos" },
     { idx: -1, icon: "☰",  label: t.mas    || "Más"    },
   ];
-  const SWIPEABLE_TABS = [0, 1, 2, 3]; // tab raggiungibili con swipe
-
-  // 2.11 Swipe tra tab su mobile
-  const swipeRef = useRef({ startX: null, startY: null });
-  const handleTouchStart = useCallback((e) => {
-    swipeRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY };
-  }, []);
-  const handleTouchEnd = useCallback((e) => {
-    if (!isMobile) return;
-    const dx = e.changedTouches[0].clientX - swipeRef.current.startX;
-    const dy = e.changedTouches[0].clientY - swipeRef.current.startY;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // troppo corto o verticale
-    const currIdx = SWIPEABLE_TABS.indexOf(tab);
-    if (currIdx === -1) return; // tab non swipeable
-    if (dx < 0 && currIdx < SWIPEABLE_TABS.length - 1) setTab(SWIPEABLE_TABS[currIdx + 1]);
-    if (dx > 0 && currIdx > 0) setTab(SWIPEABLE_TABS[currIdx - 1]);
-  }, [isMobile, tab]);
+  const SWIPEABLE_TABS = [0, 1, 2, 3];
 
   return (
     <div style={{ fontFamily:"'Segoe UI',system-ui,sans-serif",background:"#f0f4f8",minHeight:"100vh",
@@ -376,6 +380,7 @@ export default function App() {
               {TABS_DEF.map((tb,i) => {
                 const isMain = [0,1,2,5].includes(i);
                 if (isMain) return null;
+                if (tb.adminOnly && !ADMIN_EMAILS.has(user?.email)) return null;
                 return (
                   <button key={i} onClick={() => { setTab(i); setShowMoreMenu(false); }}
                     style={{ display:"flex",flexDirection:"column",alignItems:"center",gap:4,
@@ -565,14 +570,17 @@ export default function App() {
       {/* ── NAV TAB DESKTOP ─────────────────────────────────────────────────── */}
       {!isMobile && (
         <nav role="tablist" className="no-print" style={{ background:"white",borderBottom:"2px solid #e2e8f0",display:"flex",overflowX:"auto",WebkitOverflowScrolling:"touch" }}>
-          {TABS_DEF.map((tb,i) => (
+          {TABS_DEF.map((tb,i) => {
+            if (tb.adminOnly && !ADMIN_EMAILS.has(user?.email)) return null;
+            return (
             <button key={i} onClick={() => setTab(i)} aria-selected={tab===i} role="tab"
               style={{ padding:"10px 12px",border:"none",borderBottom:`3px solid ${tab===i?"#2b6cb0":"transparent"}`,
                 background:"white",color:tab===i?"#2b6cb0":"#718096",cursor:"pointer",
                 fontSize:12,fontWeight:tab===i?700:500,whiteSpace:"nowrap",transition:"all .2s",flexShrink:0 }}>
               <span style={{ marginRight:4 }}>{tb.icon}</span><span>{tb.label}</span>
             </button>
-          ))}
+            );
+          })}
         </nav>
       )}
 
