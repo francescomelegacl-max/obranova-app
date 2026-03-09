@@ -78,9 +78,19 @@ export const PAYWALL_FEATURES = {
 
 // ── Hook principale ───────────────────────────────────────────────────────────
 export function usePlan({ workspace } = {}, proyectos = []) {
-  const plan   = workspace?.plan || "free";
+  const rawPlan = workspace?.plan || "free";
+  const trialEndsAt = workspace?.trialEndsAt || null;
+
+  // 4.5 Trial Pro: se trialEndsAt è nel futuro, tratta come pro
+  const isTrialActive = trialEndsAt && new Date(trialEndsAt) > new Date();
+  const plan   = isTrialActive ? "pro" : rawPlan;
   const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
   const isPro  = plan === "pro" || plan === "team";
+
+  // Giorni rimasti nel trial
+  const trialDaysLeft = isTrialActive
+    ? Math.ceil((new Date(trialEndsAt) - new Date()) / 86400000)
+    : 0;
 
   // Conta solo progetti "attivi" (non terminati/rifiutati)
   const activeProyectos = proyectos.filter(
@@ -106,6 +116,7 @@ export function usePlan({ workspace } = {}, proyectos = []) {
 
   return {
     plan,
+    rawPlan,
     isPro,
     limits,
     canPlan: canUse,
@@ -113,5 +124,7 @@ export function usePlan({ workspace } = {}, proyectos = []) {
     canCreateProyecto,
     proyectosRestantes,
     activeCount: activeProyectos.length,
+    isTrialActive,
+    trialDaysLeft,
   };
 }

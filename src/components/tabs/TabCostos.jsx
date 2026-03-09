@@ -365,15 +365,34 @@ function PartidaCard({ p, cats, updP, delP, onEdit, t }) {
 }
 
 // ── TabCostos — mobile card + desktop table ────────────────────────────────────
-export default function TabCostos({ partidas = [], cats = [], addPartida, updP, delP, addFromListino, listino = [], t = {}, info = {}, pct = {}, condPago = "", condPagoPersonalizado = "", cuotas = [], iva = false, onApplyTemplate, canExcel = true, canTemplates = true, onPaywall }) {
+export default function TabCostos({ partidas = [], cats = [], addPartida, updP, delP, dupP, addFromListino, listino = [], t = {}, info = {}, pct = {}, condPago = "", condPagoPersonalizado = "", cuotas = [], iva = false, onApplyTemplate, canExcel = true, canTemplates = true, canPlan, onPaywall }) {
   const [filterCat,       setFilterCat]       = useState(null);
   const [showExtras,      setShowExtras]      = useState(false);
   const [editingP,        setEditingP]        = useState(null);
   const [showSalvaTPL,    setShowSalvaTPL]    = useState(false);  // 3.3
   const [showAplicaTPL,   setShowAplicaTPL]   = useState(false);  // 3.3
   const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches);
+  // 2.2 Drag & drop state
+  const [dragId,   setDragId]   = useState(null);
+  const [dragOver, setDragOver] = useState(null);
 
   const { getAll, saveTemplate, deleteTemplate, markUsed } = useTemplates();
+
+  // 2.2 Handlers drag & drop (reordina partidas via updP)
+  const handleDragStart = useCallback((id) => setDragId(id), []);
+  const handleDragEnd   = useCallback(() => { setDragId(null); setDragOver(null); }, []);
+  const handleDrop      = useCallback((targetId) => {
+    if (!dragId || dragId === targetId) return;
+    const from = partidas.findIndex(p => p.id === dragId);
+    const to   = partidas.findIndex(p => p.id === targetId);
+    if (from === -1 || to === -1) return;
+    const reordered = [...partidas];
+    const [moved]   = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+    // Aggiorna campo "order" su ciascuna partida spostata
+    reordered.forEach((p, i) => { if (p.order !== i) updP(p.id, { order: i }); });
+    setDragId(null); setDragOver(null);
+  }, [dragId, partidas, updP]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -386,7 +405,9 @@ export default function TabCostos({ partidas = [], cats = [], addPartida, updP, 
 
   const filtered = useMemo(() => {
     const list = filterCat ? partidas.filter(p => p.cat === filterCat) : [...partidas];
-    // Ordina per categoria per separatori
+    // 2.2 Se hanno campo order, usa quello; altrimenti ordina per categoria
+    const hasOrder = list.some(p => p.order !== undefined);
+    if (hasOrder) return list.sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
     return list.sort((a, b) => (String(a.cat || "")).localeCompare(String(b.cat || "")));
   }, [partidas, filterCat]);
 
@@ -421,9 +442,19 @@ export default function TabCostos({ partidas = [], cats = [], addPartida, updP, 
       }
       rows.push(
         <tr key={p.id}
-          style={{ background: i % 2 === 0 ? "#f7fafc" : "white" }}
-          onMouseEnter={e => e.currentTarget.style.background = "#ebf8ff"}
-          onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? "#f7fafc" : "white"}
+          draggable
+          onDragStart={() => handleDragStart(p.id)}
+          onDragEnd={handleDragEnd}
+          onDragOver={e => { e.preventDefault(); setDragOver(p.id); }}
+          onDrop={() => handleDrop(p.id)}
+          style={{
+            background: dragOver === p.id && dragId !== p.id ? "#ebf8ff" : i % 2 === 0 ? "#f7fafc" : "white",
+            opacity: dragId === p.id ? 0.4 : 1,
+            cursor: "grab",
+            outline: dragOver === p.id && dragId !== p.id ? "2px dashed #2b6cb0" : "none",
+          }}
+          onMouseEnter={e => { if (dragId !== p.id) e.currentTarget.style.background = "#ebf8ff"; }}
+          onMouseLeave={e => { if (dragId !== p.id) e.currentTarget.style.background = i % 2 === 0 ? "#f7fafc" : "white"; }}
         >
           <td style={{ padding: "5px 6px" }}>
             {(() => {
@@ -498,7 +529,16 @@ export default function TabCostos({ partidas = [], cats = [], addPartida, updP, 
         nodes.push(<CategoryDividerMobile key={`mcat-${p.cat}`} cat={p.cat} />);
       }
       nodes.push(
-        <PartidaCard key={p.id} p={p} cats={cats} updP={updP} delP={delP} onEdit={setEditingP} t={t} />
+        // 2.2 Drag & drop wrapper
+        <div key={p.id}
+          draggable
+          onDragStart={() => handleDragStart(p.id)}
+          onDragEnd={handleDragEnd}
+          onDragOver={e => { e.preventDefault(); setDragOver(p.id); }}
+          onDrop={() => handleDrop(p.id)}
+          style={{ opacity: dragId === p.id ? 0.4 : 1, outline: dragOver === p.id && dragId !== p.id ? "2px dashed #2b6cb0" : "none", borderRadius: 12, transition: "opacity .15s" }}>
+          <PartidaCard p={p} cats={cats} updP={updP} delP={delP} dupP={dupP} onEdit={setEditingP} t={t} />
+        </div>
       );
     });
     return nodes;

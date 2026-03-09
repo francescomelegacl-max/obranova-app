@@ -6,12 +6,27 @@
 import { useState, useEffect } from "react";
 import { calcTotals } from "../../utils/helpers";
 
-// ── Generador XML DTE básico (borrador) ───────────────────────────────────────
-function generarXMLDTE({ tipo, folio, rutReceptor, giroReceptor, proyecto, totals, iva }) {
-  const fecha = new Date().toISOString().slice(0, 10);
-  const montoNeto = Math.round(totals.total);
-  const montoIVA  = iva ? Math.round(totals.iva) : 0;
-  const montoTotal = iva ? Math.round(totals.totalIva) : montoNeto;
+// ── Lee configuración tributaria del localStorage ─────────────────────────────
+function getEmpresaSettings() {
+  const saved = localStorage.getItem("empresa_settings");
+  return saved ? JSON.parse(saved) : {
+    rut: "00000000-0", razonSocial: "Tu Empresa SpA",
+    giro: "Construcción", ciudad: "", direccion: "", email: "", telefono: "",
+    tipoContribuyente: "empresa",
+  };
+}
+
+// ── Generador XML DTE — soporta Factura (IVA 19%) y Boleta Honorarios (ret. 10%) ──
+function generarXMLDTE({ tipo, folio, rutReceptor, giroReceptor, proyecto, totals, iva, empresa }) {
+  const fecha      = new Date().toISOString().slice(0, 10);
+  const esHonorarios = empresa.tipoContribuyente === "persona_natural";
+
+  // Montos según tipo contribuyente
+  const montoNeto   = Math.round(totals.total);
+  const montoIVA    = (!esHonorarios && iva) ? Math.round(totals.ivaAmt) : 0;
+  const retencion   = esHonorarios ? Math.round(montoNeto * 0.10) : 0;
+  const montoLiq    = esHonorarios ? montoNeto - retencion : 0;
+  const montoTotal  = esHonorarios ? montoLiq : (iva ? Math.round(totals.totalIva) : montoNeto);
 
   const partidas = (proyecto.partidas || [])
     .filter(p => p.cant > 0 && p.pu > 0)
@@ -25,6 +40,20 @@ function generarXMLDTE({ tipo, folio, rutReceptor, giroReceptor, proyecto, total
       <MontoItem>${Math.round(p.cant * p.pu)}</MontoItem>
     </Detalle>`).join("");
 
+  // Bloque Totales según régimen
+  const bloqueTotales = esHonorarios
+    ? `<Totales>
+        <MntTotal>${montoNeto}</MntTotal>
+        <MontoNF>${retencion}</MontoNF>
+        <MontoPagos>${montoLiq}</MontoPagos>
+      </Totales>`
+    : `<Totales>
+        <MntNeto>${montoNeto}</MntNeto>
+        <TasaIVA>19</TasaIVA>
+        <IVA>${montoIVA}</IVA>
+        <MntTotal>${montoTotal}</MntTotal>
+      </Totales>`;
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <DTE version="1.0">
   <Documento ID="DTE-${tipo}-${folio}">
@@ -37,10 +66,12 @@ function generarXMLDTE({ tipo, folio, rutReceptor, giroReceptor, proyecto, total
         <FmaPago>1</FmaPago>
       </IdDoc>
       <Emisor>
-        <RUTEmisor>00000000-0</RUTEmisor>
-        <RznSoc>Tu Empresa SpA</RznSoc>
-        <GiroEmis>Construcción</GiroEmis>
+        <RUTEmisor>${empresa.rut || "00000000-0"}</RUTEmisor>
+        <RznSoc>${empresa.razonSocial || "Tu Empresa"}</RznSoc>
+        <GiroEmis>${empresa.giro || "Construcción"}</GiroEmis>
         <Acteco>452010</Acteco>
+        ${empresa.direccion ? `<DirOrigen>${empresa.direccion}</DirOrigen>` : ""}
+        ${empresa.ciudad    ? `<CiudadOrigen>${empresa.ciudad}</CiudadOrigen>` : ""}
       </Emisor>
       <Receptor>
         <RUTRecep>${rutReceptor || "00000000-0"}</RUTRecep>
@@ -49,12 +80,7 @@ function generarXMLDTE({ tipo, folio, rutReceptor, giroReceptor, proyecto, total
         <DirRecep>${proyecto.info?.direccion || ""}</DirRecep>
         <CiudadRecep>${proyecto.info?.ciudad || ""}</CiudadRecep>
       </Receptor>
-      <Totales>
-        <MntNeto>${montoNeto}</MntNeto>
-        <TasaIVA>19</TasaIVA>
-        <IVA>${montoIVA}</IVA>
-        <MntTotal>${montoTotal}</MntTotal>
-      </Totales>
+      ${bloqueTotales}
     </Encabezado>
     <Detalle>
 ${partidas}
@@ -64,18 +90,22 @@ ${partidas}
 }
 
 // ── Tipos de documento SII ─────────────────────────────────────────────────────
-const TIPOS_DTE = [
+const TIPOS_DTE_EMPRESA = [
   { codigo: "33", nombre: "Factura Electrónica" },
   { codigo: "39", nombre: "Boleta Electrónica" },
   { codigo: "61", nombre: "Nota de Crédito" },
   { codigo: "56", nombre: "Nota de Débito" },
+];
+const TIPOS_DTE_HONORARIOS = [
+  { codigo: "39", nombre: "Boleta de Honorarios Electrónica" },
+  { codigo: "61", nombre: "Nota de Crédito" },
 ];
 
 // ── Componente principal ───────────────────────────────────────────────────────
 export default function TabSII({ proyectos, workspaceId, t, onToast }) {
   const [historial,     setHistorial]     = useState([]);
   const [loadingHist,   setLoadingHist]   = useState(true);
-  const [modal,         setModal]         = useState(null); // { proyecto }
+  const [modal,         setModal]         = useState(null);
   const [tipo,          setTipo]          = useState("33");
   const [folio,         setFolio]         = useState("1");
   const [rutReceptor,   setRutReceptor]   = useState("");
@@ -83,7 +113,15 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
   const [xmlGenerado,   setXmlGenerado]   = useState("");
   const [guardando,     setGuardando]     = useState(false);
 
-  const aceptados = proyectos.filter(p => p.estado === "Aceptado");
+  const empresa       = getEmpresaSettings();
+  const esHonorarios  = empresa.tipoContribuyente === "persona_natural";
+  const tiposDTE      = esHonorarios ? TIPOS_DTE_HONORARIOS : TIPOS_DTE_EMPRESA;
+  const aceptados     = proyectos.filter(p => p.estado === "Aceptado");
+
+  // Cambia tipo default quando cambia régimen
+  useEffect(() => {
+    setTipo(esHonorarios ? "39" : "33");
+  }, [esHonorarios]);
 
   // ── Carica storico DTE da Firestore ──────────────────────────────────────
   useEffect(() => {
@@ -111,7 +149,7 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
   const handleGenerar = () => {
     if (!modal) return;
     const totals = calcTotals(modal.partidas || [], modal.pct || {});
-    const xml = generarXMLDTE({ tipo, folio, rutReceptor, giroReceptor, proyecto: modal, totals, iva: modal.iva });
+    const xml = generarXMLDTE({ tipo, folio, rutReceptor, giroReceptor, proyecto: modal, totals, iva: modal.iva, empresa });
     setXmlGenerado(xml);
   };
 
@@ -140,6 +178,7 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
         tipo,
         folio,
         rutReceptor,
+        tipoContribuyente: empresa.tipoContribuyente,
         creadoAt:    new Date().toISOString(),
         xml:         xmlGenerado,
       };
@@ -157,6 +196,15 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
 
   const fmt = (n) => new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(n || 0);
 
+  // ── Resumen tributario mensile ────────────────────────────────────────────
+  const mesActual = new Date().toISOString().slice(0, 7);
+  const dteMes    = historial.filter(d => d.creadoAt?.slice(0, 7) === mesActual);
+  const totalMes  = dteMes.reduce((s, d) => {
+    try { const p = (d.xml || "").match(/<MntTotal>(\d+)<\/MntTotal>/); return s + (p ? parseInt(p[1]) : 0); } catch { return s; }
+  }, 0);
+  const ivaEstimado    = esHonorarios ? 0 : Math.round(totalMes * 19 / 119);
+  const retenEstimada  = esHonorarios ? Math.round(totalMes * 0.10) : 0;
+
   return (
     <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
 
@@ -164,6 +212,38 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
       <div style={{ background:"linear-gradient(135deg,#1a365d,#2d3748)",borderRadius:12,padding:"18px 20px",color:"white" }}>
         <div style={{ fontSize:18,fontWeight:800,marginBottom:3 }}>🇨🇱 {t.siiTitulo || "Documentos Tributarios Electrónicos (DTE)"}</div>
         <div style={{ color:"#a0aec0",fontSize:12 }}>{t.siiDesc || "Genera XML para el SII a partir de tus presupuestos aceptados."}</div>
+        {empresa.rut && (
+          <div style={{ marginTop:8,fontSize:11,color:"#90cdf4" }}>
+            {esHonorarios ? "👤 Persona Natural" : "🏢 Empresa"} · RUT: <strong>{empresa.rut}</strong> · {empresa.razonSocial}
+          </div>
+        )}
+        {!empresa.rut && (
+          <div style={{ marginTop:8,fontSize:11,color:"#fc8181",background:"rgba(255,255,255,.1)",borderRadius:6,padding:"5px 10px",display:"inline-block" }}>
+            ⚠️ Configura tu RUT en Ajustes → Datos Tributarios
+          </div>
+        )}
+      </div>
+
+      {/* Resumen tributario mensile */}
+      <div style={{ background:"white",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,.07)" }}>
+        <div style={{ fontWeight:700,fontSize:14,color:"#1a365d",marginBottom:12 }}>
+          📊 Resumen Tributario — {new Date().toLocaleDateString("es-CL", { month:"long", year:"numeric" })}
+        </div>
+        <div style={{ display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10 }}>
+          {[
+            { label:"DTE emitidos",   value: dteMes.length,        color:"#2b6cb0", bg:"#ebf8ff" },
+            { label:"Monto total",    value: fmt(totalMes),        color:"#276749", bg:"#f0fff4" },
+            esHonorarios
+              ? { label:"Retención 10%", value: fmt(retenEstimada), color:"#553c9a", bg:"#faf5ff" }
+              : { label:"IVA 19% estimado", value: fmt(ivaEstimado), color:"#c05621", bg:"#fffaf0" },
+            { label:"Neto a declarar", value: fmt(esHonorarios ? totalMes - retenEstimada : totalMes - ivaEstimado), color:"#1a365d", bg:"#f7fafc" },
+          ].map(({ label, value, color, bg }) => (
+            <div key={label} style={{ background:bg,borderRadius:9,padding:"12px 14px",textAlign:"center" }}>
+              <div style={{ fontSize:18,fontWeight:900,color }}>{value}</div>
+              <div style={{ fontSize:10,color:"#718096",marginTop:2 }}>{label}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Lista presupuestos aceptados */}
@@ -171,11 +251,9 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
         <div style={{ fontWeight:700,fontSize:14,color:"#1a365d",marginBottom:12 }}>
           📋 {t.aceptados || "Presupuestos Aceptados"} ({aceptados.length})
         </div>
-
         {aceptados.length === 0 ? (
-          <div style={{ textAlign:"center",padding:"40px 0",color:"#a0aec0" }}>
-            <div style={{ fontSize:36,marginBottom:8 }}>📄</div>
-            <div>{t.siiSinAceptados || "No hay presupuestos aceptados para generar DTE."}</div>
+          <div style={{ color:"#a0aec0",fontSize:12,textAlign:"center",padding:"20px 0" }}>
+            Sin presupuestos aceptados aún.
           </div>
         ) : (
           <div style={{ display:"flex",flexDirection:"column",gap:8 }}>
@@ -184,17 +262,20 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
               const total  = p.iva ? totals.totalIva : totals.total;
               return (
                 <div key={p.id} style={{ display:"flex",justifyContent:"space-between",alignItems:"center",
-                  padding:"12px 16px",background:"#f7fafc",borderRadius:10,border:"1px solid #e2e8f0",flexWrap:"wrap",gap:8 }}>
+                  padding:"10px 14px",background:"#f7fafc",borderRadius:9,flexWrap:"wrap",gap:8 }}>
                   <div>
-                    <div style={{ fontWeight:700,fontSize:14,color:"#1a365d" }}>{p.info?.cliente || "—"}</div>
-                    <div style={{ fontSize:11,color:"#718096",marginTop:2 }}>{p.info?.descripcion?.slice(0,50) || "—"}</div>
+                    <div style={{ fontWeight:700,fontSize:13,color:"#1a365d" }}>{p.info?.cliente || "—"}</div>
+                    <div style={{ fontSize:11,color:"#718096" }}>{p.info?.descripcion || "—"}</div>
                   </div>
-                  <div style={{ display:"flex",alignItems:"center",gap:12 }}>
-                    <div style={{ fontWeight:800,fontSize:15,color:"#276749" }}>{fmt(total)}</div>
+                  <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+                    <div style={{ textAlign:"right" }}>
+                      <div style={{ fontWeight:800,fontSize:14,color:"#276749" }}>{fmt(total)}</div>
+                      <div style={{ fontSize:10,color:"#a0aec0" }}>{p.iva ? "IVA incl." : "s/IVA"}</div>
+                    </div>
                     <button onClick={() => { setModal(p); setXmlGenerado(""); }}
-                      style={{ padding:"7px 14px",background:"#1a365d",color:"white",border:"none",
+                      style={{ padding:"7px 16px",background:"#1a365d",color:"white",border:"none",
                         borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12 }}>
-                      🇨🇱 {t.siiGenerarDTE || "Generar DTE"}
+                      🇨🇱 Generar DTE
                     </button>
                   </div>
                 </div>
@@ -236,7 +317,7 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
             <table style={{ width:"100%",borderCollapse:"collapse",fontSize:12 }}>
               <thead>
                 <tr style={{ background:"#1a365d",color:"white" }}>
-                  {["Tipo","Folio","Cliente","RUT","Fecha","XML"].map(h => (
+                  {["Tipo","Folio","Cliente","RUT","Régimen","Fecha","XML"].map(h => (
                     <th key={h} style={{ padding:"8px 10px",textAlign:"left",fontWeight:600,whiteSpace:"nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -248,6 +329,13 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
                     <td style={{ padding:"8px 10px" }}>{d.folio}</td>
                     <td style={{ padding:"8px 10px",color:"#1a365d",fontWeight:600 }}>{d.cliente}</td>
                     <td style={{ padding:"8px 10px",color:"#718096" }}>{d.rutReceptor || "—"}</td>
+                    <td style={{ padding:"8px 10px" }}>
+                      <span style={{ fontSize:10,padding:"2px 7px",borderRadius:99,fontWeight:700,
+                        background: d.tipoContribuyente==="persona_natural"?"#faf5ff":"#ebf8ff",
+                        color:      d.tipoContribuyente==="persona_natural"?"#553c9a":"#2b6cb0" }}>
+                        {d.tipoContribuyente==="persona_natural" ? "Honorarios" : "Empresa"}
+                      </span>
+                    </td>
                     <td style={{ padding:"8px 10px",color:"#718096" }}>{d.creadoAt?.slice(0,10)}</td>
                     <td style={{ padding:"8px 10px" }}>
                       {d.xml && (
@@ -283,11 +371,20 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
 
             <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20 }}>
               <div style={{ fontSize:17,fontWeight:800,color:"#1a365d" }}>
-                🇨🇱 {t.siiGenerarDTE} — {modal.info?.cliente}
+                🇨🇱 {t.siiGenerarDTE || "Generar DTE"} — {modal.info?.cliente}
               </div>
               <button onClick={() => setModal(null)}
                 style={{ background:"#2d3748",border:"none",borderRadius:8,cursor:"pointer",
                   padding:"5px 12px",color:"white",fontWeight:700 }}>✕</button>
+            </div>
+
+            {/* Info régimen */}
+            <div style={{ background: esHonorarios?"#faf5ff":"#ebf8ff", borderRadius:9, padding:"8px 14px", marginBottom:16, fontSize:12,
+              border:`1px solid ${esHonorarios?"#d6bcfa":"#bee3f8"}` }}>
+              {esHonorarios
+                ? <><strong style={{ color:"#553c9a" }}>👤 Persona Natural</strong> — Se aplicará retención 10% automática en el XML</>
+                : <><strong style={{ color:"#2b6cb0" }}>🏢 Empresa</strong> — Se incluirá IVA 19% en el XML</>
+              }
             </div>
 
             <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
@@ -298,14 +395,13 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
                 </label>
                 <select value={tipo} onChange={e => setTipo(e.target.value)}
                   style={{ width:"100%",padding:"9px 12px",border:"2px solid #e2e8f0",borderRadius:8,fontSize:13,color:"#1a365d",background:"white" }}>
-                  {TIPOS_DTE.map(td => (
+                  {tiposDTE.map(td => (
                     <option key={td.codigo} value={td.codigo}>{td.codigo} — {td.nombre}</option>
                   ))}
                 </select>
               </div>
 
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:10 }}>
-                {/* Folio */}
                 <div>
                   <label style={{ fontSize:12,fontWeight:700,color:"#4a5568",display:"block",marginBottom:4 }}>
                     {t.siiFolio || "Folio"}
@@ -313,7 +409,6 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
                   <input type="number" value={folio} onChange={e => setFolio(e.target.value)} min={1}
                     style={{ width:"100%",padding:"9px 12px",border:"2px solid #e2e8f0",borderRadius:8,fontSize:13,color:"#1a365d" }} />
                 </div>
-                {/* RUT Receptor */}
                 <div>
                   <label style={{ fontSize:12,fontWeight:700,color:"#4a5568",display:"block",marginBottom:4 }}>
                     {t.siiRutReceptor || "RUT receptor"}
@@ -324,7 +419,6 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
                 </div>
               </div>
 
-              {/* Giro */}
               <div>
                 <label style={{ fontSize:12,fontWeight:700,color:"#4a5568",display:"block",marginBottom:4 }}>
                   {t.siiGiro || "Giro receptor"}
@@ -334,7 +428,33 @@ export default function TabSII({ proyectos, workspaceId, t, onToast }) {
                   style={{ width:"100%",padding:"9px 12px",border:"2px solid #e2e8f0",borderRadius:8,fontSize:13,color:"#1a365d" }} />
               </div>
 
-              {/* Bottoni */}
+              {/* Preview montos */}
+              {(() => {
+                const totals = calcTotals(modal.partidas || [], modal.pct || {});
+                const neto   = Math.round(totals.total);
+                const ret    = esHonorarios ? Math.round(neto * 0.10) : 0;
+                const iva    = (!esHonorarios && modal.iva) ? Math.round(totals.ivaAmt) : 0;
+                const total  = esHonorarios ? neto - ret : (modal.iva ? Math.round(totals.totalIva) : neto);
+                return (
+                  <div style={{ background:"#f7fafc",borderRadius:9,padding:"10px 14px",fontSize:12 }}>
+                    <div style={{ fontWeight:700,color:"#1a365d",marginBottom:6 }}>Vista previa montos XML</div>
+                    {[
+                      ["Monto Neto", fmt(neto)],
+                      esHonorarios && ["Retención 10%", `- ${fmt(ret)}`],
+                      !esHonorarios && modal.iva && ["IVA 19%", fmt(iva)],
+                      ["Total documento", fmt(total)],
+                    ].filter(Boolean).map(([label, value]) => (
+                      <div key={label} style={{ display:"flex",justifyContent:"space-between",padding:"3px 0",
+                        borderTop: label==="Total documento"?"1px solid #e2e8f0":"none",
+                        fontWeight: label==="Total documento"?700:400,
+                        color: label==="Total documento"?"#1a365d":"#4a5568" }}>
+                        <span>{label}</span><span>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
               <div style={{ display:"flex",gap:8,marginTop:4 }}>
                 <button onClick={handleGenerar}
                   style={{ flex:1,padding:"11px",background:"#1a365d",color:"white",border:"none",

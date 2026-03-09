@@ -69,7 +69,7 @@ function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, value, name }) {
   );
 }
 
-export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProject, onNewProject, plan, proyectosRestantes, onUpgrade }) {
+export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProject, onNewProject, plan, proyectosRestantes, onUpgrade, itemsInAlert = [], currentId }) {
 
   const [activeSlice, setActiveSlice] = useState(null);
 
@@ -236,6 +236,40 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
+
+        {/* 2.5 Continuar donde dejaste */}
+        {currentId && (() => { const last = proyectos.find(p => p.id === currentId); return last ? (
+          <div onClick={() => onOpenProject?.(last)}
+            style={{ gridColumn: "1 / -1", background: "linear-gradient(135deg,#ebf8ff,#e9d8fd)",
+              border: "1px solid #bee3f8", borderRadius: 12, padding: "14px 16px",
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 26 }}>▶️</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#1a365d" }}>Continuar donde dejaste</div>
+              <div style={{ fontSize: 12, color: "#4a5568" }}>{last.nombre || last.cliente || "Proyecto sin nombre"}</div>
+            </div>
+            <span style={{ fontSize: 18, color: "#2b6cb0" }}>→</span>
+          </div>
+        ) : null; })()}
+
+        {/* 2.6 Alerta bodega */}
+        {itemsInAlert.length > 0 && (
+          <div style={{ gridColumn: "1 / -1", background: "#fff5f5",
+            border: "1px solid #fed7d7", borderRadius: 12, padding: "14px 16px",
+            display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 22 }}>⚠️</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#c53030" }}>
+                {itemsInAlert.length} material{itemsInAlert.length > 1 ? "es" : ""} bajo stock mínimo
+              </div>
+              <div style={{ fontSize: 11, color: "#9b2c2c" }}>
+                {itemsInAlert.slice(0, 3).map(i => i.nombre).join(", ")}{itemsInAlert.length > 3 ? "…" : ""}
+              </div>
+            </div>
+          </div>
+        )}
+
+
         {kpis.map(k => (
           <div key={k.label} style={{
             background: k.bg, border: `1px solid ${k.color}22`,

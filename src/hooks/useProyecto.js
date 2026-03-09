@@ -143,6 +143,15 @@ function reducer(state, action) {
     case "DELETE_PARTIDA":
       return { ...state, partidas: state.partidas.filter(p => p.id !== action.payload) };
 
+    case "DUP_PARTIDA": {
+      const idx = state.partidas.findIndex(p => p.id === action.payload);
+      if (idx === -1) return state;
+      const clone = { ...state.partidas[idx], id: Date.now() + Math.random() };
+      const newPartidas = [...state.partidas];
+      newPartidas.splice(idx + 1, 0, clone);
+      return { ...state, partidas: newPartidas };
+    }
+
     case "SET_CURRENT_ID":
       return { ...state, currentId: action.payload };
 
@@ -173,6 +182,7 @@ export function useProyecto() {
   const addFromListino= useCallback((item) => dispatch({ type: "ADD_PARTIDA_FROM_LISTINO", payload: item }), []);
   const updP = useCallback((id, key, value) => dispatch({ type: "UPDATE_PARTIDA", payload: { id, key, value } }), []);
   const delP = useCallback((id) => dispatch({ type: "DELETE_PARTIDA", payload: id }), []);
+  const dupP = useCallback((id) => dispatch({ type: "DUP_PARTIDA", payload: id }), []);
 
   const getCatVis = useCallback((cat) => state.catVis[cat] || { visible: true, modo: "detalle" }, [state.catVis]);
 
@@ -183,6 +193,6 @@ export function useProyecto() {
     setInfo, setPct, setEstado, setIva, setValidez,
     setCondPago, setCondPagoPersonalizado, setCuotas,
     setFotos, setCatVisKey, getCatVis,
-    addPartida, addFromListino, updP, delP,
+    addPartida, addFromListino, updP, delP, dupP,
   };
 }

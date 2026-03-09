@@ -10,6 +10,7 @@ import { useMagazzino }                     from "./hooks/useMagazzino";
 import { useFirma }                         from "./hooks/useFirma";
 import { useFatture }                       from "./hooks/useFatture";
 import { usePlan }                          from "./hooks/usePlan";
+import { useNotificaciones }               from "./hooks/useNotificaciones";
 import PaywallModal                         from "./components/PaywallModal";
 
 import T                                    from "./i18n/translations";
@@ -24,6 +25,9 @@ import ModalFotos                           from "./components/ModalFotos";
 import ModalOnboarding                      from "./components/ModalOnboarding";
 import RicercaGlobale                       from "./components/RicercaGlobale";
 import ErrorBoundary                        from "./components/ErrorBoundary";
+
+// ── Admin emails ──────────────────────────────────────────────────────────────
+const ADMIN_EMAILS = new Set(["francescomelega.cl@gmail.com", "melegaf@gmail.com"]);
 
 // ── WhatsApp inline (zero dipendenze esterne) ─────────────────────────────────
 const WA_ESTADOS = new Set(["Enviado","Aceptado","Rechazado","En obra","Finalizado"]);
@@ -55,6 +59,7 @@ const TabCalcolatore= lazy(() => import("./components/tabs/TabCalcolatore"));
 const TabKitMateriali= lazy(() => import("./components/tabs/TabKitMateriali"));
 const TabAgenda     = lazy(() => import("./components/tabs/TabAgenda"));
 const PaginaFirma   = lazy(() => import("./components/FirmaPage"));
+const AdminDashboard= lazy(() => import("./components/tabs/AdminDashboard"));
 
 // ── OtherTabs — lazy con named export wrapper (fix: no await top-level) ───────
 const TabResumen     = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabResumen })));
@@ -100,7 +105,8 @@ export default function App() {
     changeMemberRole, removeMember, updateWorkspaceName, can,
   } = useWorkspace({ onToast: showToast });
 
-  const { canPlan, plan } = usePlan({ workspace });
+  const { canPlan, plan, isPro, isTrialActive, trialDaysLeft } = usePlan({ workspace });
+  useNotificaciones({ proyectos, workspace });
   const [paywallFeature, setPaywallFeature] = useState(null);
   const openPaywall  = useCallback((feature) => setPaywallFeature(feature), []);
   const closePaywall = useCallback(() => setPaywallFeature(null), []);
@@ -109,6 +115,7 @@ export default function App() {
     proyectos, listino, fotosMap, cats, guardando,
     loadProyectos, saveProyecto, newProyecto, deleteProyecto,
     loadListino, saveListinoItem, deleteListinoItem, loadCats, addCat,
+    updateGiacenza, updatePrezzoManuale,
   } = useFirestore({ onToast: showToast, workspaceId: workspace?.id });
 
   const {
@@ -120,7 +127,7 @@ export default function App() {
   const {
     state: proy, loadProject, setInfo, setPct, setEstado, setIva, setValidez,
     setCondPago, setCondPagoPersonalizado, setCuotas, setFotos,
-    setCatVisKey, getCatVis, addPartida, addFromListino, updP, delP, dispatch,
+    setCatVisKey, getCatVis, addPartida, addFromListino, updP, delP, dupP, dispatch,
   } = useProyecto();
 
   const {
@@ -266,7 +273,8 @@ export default function App() {
     { icon:"⚙️", label: t.impostazioni || "Ajustes"   },  // 14
     { icon:"💎", label: "Planes"                       },  // 15
     { icon:"❓", label: t.tabHelp                      },  // 16
-  ], [t]);
+    ...(ADMIN_EMAILS.has(user?.email) ? [{ icon:"🛠️", label: "Admin" }] : []),  // 17
+  ], [t, user?.email]);
 
   // ── Pagina pubblica firma ─────────────────────────────────────────────────
   if (firmaToken) return (
@@ -298,6 +306,23 @@ export default function App() {
     { idx: 3,  icon: "🏗️", label: t.costos || "Costos" },
     { idx: -1, icon: "☰",  label: t.mas    || "Más"    },
   ];
+  const SWIPEABLE_TABS = [0, 1, 2, 3]; // tab raggiungibili con swipe
+
+  // 2.11 Swipe tra tab su mobile
+  const swipeRef = useRef({ startX: null, startY: null });
+  const handleTouchStart = useCallback((e) => {
+    swipeRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY };
+  }, []);
+  const handleTouchEnd = useCallback((e) => {
+    if (!isMobile) return;
+    const dx = e.changedTouches[0].clientX - swipeRef.current.startX;
+    const dy = e.changedTouches[0].clientY - swipeRef.current.startY;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // troppo corto o verticale
+    const currIdx = SWIPEABLE_TABS.indexOf(tab);
+    if (currIdx === -1) return; // tab non swipeable
+    if (dx < 0 && currIdx < SWIPEABLE_TABS.length - 1) setTab(SWIPEABLE_TABS[currIdx + 1]);
+    if (dx > 0 && currIdx > 0) setTab(SWIPEABLE_TABS[currIdx - 1]);
+  }, [isMobile, tab]);
 
   return (
     <div style={{ fontFamily:"'Segoe UI',system-ui,sans-serif",background:"#f0f4f8",minHeight:"100vh",
@@ -466,6 +491,23 @@ export default function App() {
       {/* ── BARRA STATO (solo desktop) ──────────────────────────────────────── */}
       {!isMobile && (
         <div className="no-print" style={{ background:"white",padding:"7px 14px",display:"flex",gap:6,alignItems:"center",flexWrap:"wrap",borderBottom:"1px solid #e2e8f0" }}>
+
+      {/* 4.5 Banner Trial Pro */}
+      {isTrialActive && (
+        <div className="no-print" style={{ background:"linear-gradient(135deg,#faf5ff,#ebf8ff)",borderBottom:"1px solid #d6bcfa",padding:"7px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,flexWrap:"wrap" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+            <span style={{ fontSize:16 }}>⚡</span>
+            <span style={{ fontSize:12,fontWeight:700,color:"#553c9a" }}>
+              Trial Pro activo — {trialDaysLeft} día{trialDaysLeft !== 1 ? "s" : ""} restante{trialDaysLeft !== 1 ? "s" : ""}
+            </span>
+            <span style={{ fontSize:11,color:"#718096" }}>Estás probando todas las funciones Pro gratis</span>
+          </div>
+          <button onClick={() => setTab(15)}
+            style={{ padding:"4px 14px",background:"#553c9a",color:"white",border:"none",borderRadius:7,cursor:"pointer",fontWeight:700,fontSize:11,flexShrink:0 }}>
+            Ver planes →
+          </button>
+        </div>
+      )}
           <span style={{ fontSize:12,color:"#4a5568",fontWeight:700 }}>{t.estado}:</span>
           {ESTADOS.map(e => (
             <button key={e} onClick={() => handleSetEstado(e)}
@@ -535,18 +577,22 @@ export default function App() {
       )}
 
       {/* ── MAIN ────────────────────────────────────────────────────────────── */}
-      <main style={{ padding: isMobile ? 10 : 14, maxWidth:1200, margin:"0 auto" }}>
+      <main
+        style={{ padding: isMobile ? 10 : 14, maxWidth:1200, margin:"0 auto" }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <Suspense fallback={<TabLoader />}>
           <ErrorBoundary label={TABS_DEF[tab]?.label}>
-            {tab===0  && <TabDashboard proyectos={proyectos} partidas={proy.partidas} cats={cats} t={t} onOpenProject={handleOpenProject} onNewProject={handleNewProject} />}
+            {tab===0  && <TabDashboard proyectos={proyectos} partidas={proy.partidas} cats={cats} t={t} onOpenProject={handleOpenProject} onNewProject={handleNewProject} itemsInAlert={itemsInAlert} currentId={proy.currentId} />}
             {tab===1  && <TabProyectos proyectos={proyectos} currentId={proy.currentId} onLoad={handleOpenProject} onDelete={handleDeleteProject} onPDF={handleOpenPDF} t={t} canPlan={canPlan} onPaywall={openPaywall} />}
             {tab===2  && <TabProyecto info={proy.info} setInfo={setInfo} pct={proy.pct} setPct={setPct} estado={proy.estado} setEstado={handleSetEstado} iva={proy.iva} setIva={setIva} validez={proy.validez} setValidez={setValidez} condPago={proy.condPago} setCondPago={setCondPago} condPagoPersonalizado={proy.condPagoPersonalizado} setCondPagoPersonalizado={setCondPagoPersonalizado} cuotas={proy.cuotas} setCuotas={setCuotas} partidas={proy.partidas} t={t} />}
-            {tab===3  && <TabCostos partidas={proy.partidas} cats={cats} addPartida={addPartida} updP={updP} delP={delP} addFromListino={handleAddFromListino} listino={listino} t={t} workspaceId={workspace?.id} lang={lang} info={proy.info} pct={proy.pct} condPago={proy.condPago} condPagoPersonalizado={proy.condPagoPersonalizado} cuotas={proy.cuotas} iva={proy.iva} onApplyTemplate={(tpl) => { tpl.partidas?.forEach(p => addFromListino({ ...p, id: undefined })); if (tpl.pct) dispatch({ type:"SET_PCT", payload:tpl.pct }); }} canPlan={canPlan} onPaywall={openPaywall} />}
+            {tab===3  && <TabCostos partidas={proy.partidas} cats={cats} addPartida={addPartida} updP={updP} delP={delP} dupP={dupP} addFromListino={handleAddFromListino} listino={listino} t={t} workspaceId={workspace?.id} lang={lang} info={proy.info} pct={proy.pct} condPago={proy.condPago} condPagoPersonalizado={proy.condPagoPersonalizado} cuotas={proy.cuotas} iva={proy.iva} onApplyTemplate={(tpl) => { tpl.partidas?.forEach(p => addFromListino({ ...p, id: undefined })); if (tpl.pct) dispatch({ type:"SET_PCT", payload:tpl.pct }); }} canPlan={canPlan} onPaywall={openPaywall} />}
             {tab===4  && <TabCalcolatore listino={listino} addPartida={addFromListino} cats={cats} onToast={showToast} />}
             {tab===5  && <TabKitMateriali kits={kits} cargando={cargandoKits} onSaveKit={saveKit} onDeleteKit={deleteKit} onImportarPredefinito={importarKitPredefinito} addPartida={addFromListino} cats={cats} onToast={showToast} />}
             {tab===6  && <TabResumen partidas={proy.partidas} pct={proy.pct} cats={cats} iva={proy.iva} t={t} />}
             {tab===7  && <TabVistaCliente info={proy.info} partidas={proy.partidas} pct={proy.pct} cats={cats} catVis={proy.catVis} getCatVis={getCatVis} setCatVisKey={setCatVisKey} iva={proy.iva} estado={proy.estado} currentId={proy.currentId} validez={proy.validez} t={t} onInviaFirma={handleInviaFirma} firme={firme} plan={workspace?.plan} />}
-            {tab===8  && <TabListino listino={listino} cats={cats} catColors={CAT_COLORS} newCatName={newCatName} setNewCatName={setNewCatName} onAddCat={() => { addCat(newCatName,t); setNewCatName(""); }} onDeleteItem={deleteListinoItem} onAddFromListino={handleAddFromListino} onOpenAddModal={() => setShowAddListino(true)} DEFAULT_CATS={DEFAULT_CATS} t={t} />}
+            {tab===8  && <TabListino listino={listino} cats={cats} catColors={CAT_COLORS} newCatName={newCatName} setNewCatName={setNewCatName} onAddCat={() => { addCat(newCatName,t); setNewCatName(""); }} onDeleteItem={deleteListinoItem} onAddFromListino={handleAddFromListino} onOpenAddModal={() => setShowAddListino(true)} DEFAULT_CATS={DEFAULT_CATS} t={t} onUpdatePrecio={async (id, field, value) => { await updatePrezzoManuale(id, { [field]: value }); await loadListino(); }} />}
             {tab===9  && <TabMagazzino items={magItems} movimenti={movimenti} itemsInAlert={itemsInAlert} loading={magLoading} cats={cats} proyectos={proyectos} onSaveItem={saveMagItem} onDeleteItem={deleteMagItem} onMovimento={registraMovimento} />}
             {tab===10 && <TabFatture proyectos={proyectos} fatture={fatture} onCreaFattura={creaFattura} onTogglePagata={togglePagata} onEliminaFattura={eliminaFattura} />}
             {tab===11 && <TabStorico proyectos={proyectos} t={t} canPlan={canPlan} onPaywall={openPaywall} />}
@@ -555,6 +601,7 @@ export default function App() {
             {tab===14 && <TabSettings workspace={workspace} members={members} myRole={myRole} can={can} onInvite={(email,role) => inviteMember(email,role,workspace.id)} onChangeRole={changeMemberRole} onRemoveMember={removeMember} onUpdateName={updateWorkspaceName} onGoToPiani={() => setTab(15)} />}
             {tab===15 && <TabPiani workspace={workspace} />}
             {tab===16 && <TabHelp t={t} />}
+            {tab===17 && ADMIN_EMAILS.has(user?.email) && <AdminDashboard userEmail={user.email} />}
           </ErrorBoundary>
         </Suspense>
       </main>

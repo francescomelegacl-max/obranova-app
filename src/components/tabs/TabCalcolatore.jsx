@@ -223,11 +223,11 @@ export default function TabCalcolatore({ listino = [], standalone = false, addPa
     const catDefault = cats[0] || "Obra Gruesa";
     righe.filter(r => r.desc.trim()).forEach(r => {
       addPartida({
-        desc:   r.desc,
+        nombre: r.desc,
         cat:    r.tipo === "mano" ? (cats.find(c => c.toLowerCase().includes("mano") || c.toLowerCase().includes("obra")) || catDefault) : catDefault,
-        qty:    r.cant,
-        unit:   r.unidad,
-        price:  r.pu,
+        cant:   r.cant,
+        unidad: r.unidad,
+        pu:     r.pu,
         nota:   `[Calculadora: ${nome || "cálculo rápido"}]`,
       });
     });

@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default":    "obra-nova-spa",
+    "production": "obra-nova-spa"
+  }
+}

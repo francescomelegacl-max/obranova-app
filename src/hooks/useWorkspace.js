@@ -92,11 +92,16 @@ export function useWorkspace({ onToast }) {
     if (!name?.trim()) { onToast("❌ Inserisci un nome per l'azienda"); return null; }
     try {
       const ref = doc(collection(db, "workspaces"));
+      const trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 14);
       const wsData = {
         name: name.trim(),
         ownerId: u,
+        ownerEmail: userEmail() || "",
         createdAt: new Date().toISOString(),
-        plan: "free", // free | pro | team | enterprise
+        plan: "free",
+        // 4.5 Trial Pro 14gg automatico alla creazione
+        trialEndsAt: trialEnd.toISOString(),
       };
       await setDoc(ref, wsData);
       // Aggiunge il creatore come owner — FIX 1.3: include campo uid per query collectionGroup

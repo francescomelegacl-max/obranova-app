@@ -4,6 +4,23 @@
 export const fmt = (n) =>
   "$ " + Math.round(n || 0).toLocaleString("es-CL");
 
+// 3.9 Multi-moneda: formatta in base alla moneda del progetto
+const MONEDA_CONFIG = {
+  CLP: { locale: "es-CL", currency: "CLP", symbol: "$", decimals: 0 },
+  USD: { locale: "en-US", currency: "USD", symbol: "US$", decimals: 2 },
+  UF:  { locale: "es-CL", currency: null,  symbol: "UF", decimals: 4 },
+  EUR: { locale: "es-ES", currency: "EUR", symbol: "€", decimals: 2 },
+};
+export const fmtMoneda = (n, moneda = "CLP") => {
+  const cfg = MONEDA_CONFIG[moneda] || MONEDA_CONFIG.CLP;
+  const num = Number(n || 0);
+  if (cfg.currency) {
+    return num.toLocaleString(cfg.locale, { style: "currency", currency: cfg.currency, maximumFractionDigits: cfg.decimals, minimumFractionDigits: cfg.decimals });
+  }
+  // UF: no simbolo ISO, usa prefisso
+  return `${cfg.symbol} ${num.toFixed(cfg.decimals).replace(".", ",")}`;
+};
+
 /** Formatta una percentuale con segno: +12.3% / -5.0% */
 export const fmtPct = (n) =>
   (n >= 0 ? "+" : "") + n.toFixed(1) + "%";

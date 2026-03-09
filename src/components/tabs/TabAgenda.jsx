@@ -533,6 +533,17 @@ function ModalEvento({ event, onClose, onOpenProject, onDelete }) {
     window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dt}/${dt}&details=${detail}`, "_blank");
   };
 
+  const handleWA = () => {
+    const tel = event.raw?.telefono || event.raw?.info?.telefono || "";
+    const msg = encodeURIComponent(`Hola, le recuerdo que el ${fmtDate(event.fecha)} ${event.label}. Quedamos a disposición.`);
+    const url = tel
+      ? `https://wa.me/${tel.replace(/\D/g, "")}?text=${msg}`
+      : `https://wa.me/?text=${msg}`;
+    window.open(url, "_blank");
+  };
+
+  const showWA = ["proyecto", "vencimiento", "fin"].includes(event.tipo);
+
   return (
     <div onClick={e => e.target === e.currentTarget && onClose()}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 3000,
@@ -568,6 +579,13 @@ function ModalEvento({ event, onClose, onOpenProject, onDelete }) {
               style={{ padding: "8px 14px", background: "#1a365d", color: "white", border: "none",
                 borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>
               📋 Abrir proyecto
+            </button>
+          )}
+          {showWA && (
+            <button onClick={handleWA}
+              style={{ padding: "8px 14px", background: "#25D366", color: "white", border: "none",
+                borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>
+              💬 Recordar por WA
             </button>
           )}
           <button onClick={handleGCal}

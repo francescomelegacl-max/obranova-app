@@ -16,6 +16,128 @@ export function usePDFSettings() {
   };
 }
 
+// ─── Helper: legge/scrive dati tributari in localStorage ─────────────────────
+export function useEmpresaSettings() {
+  const saved = localStorage.getItem("empresa_settings");
+  return saved ? JSON.parse(saved) : {
+    rut:            "",
+    razonSocial:    "",
+    giro:           "",
+    direccion:      "",
+    ciudad:         "",
+    telefono:       "",
+    email:          "",
+    tipoContribuyente: "empresa", // "empresa" | "persona_natural"
+  };
+}
+
+// ─── Sezione Datos Tributarios ────────────────────────────────────────────────
+function DatosTributariosSection() {
+  const [cfg, setCfg] = useState(() => {
+    const saved = localStorage.getItem("empresa_settings");
+    return saved ? JSON.parse(saved) : {
+      rut:            "",
+      razonSocial:    "",
+      giro:           "",
+      direccion:      "",
+      ciudad:         "",
+      telefono:       "",
+      email:          "",
+      tipoContribuyente: "empresa",
+    };
+  });
+  const [saved, setSaved] = useState(false);
+
+  const u = (k, v) => setCfg(x => ({ ...x, [k]: v }));
+
+  const handleSave = () => {
+    localStorage.setItem("empresa_settings", JSON.stringify(cfg));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const inp = (label, key, placeholder, type = "text") => (
+    <div>
+      <label style={{ fontSize: 11, color: "#718096", fontWeight: 700, display: "block", marginBottom: 4 }}>{label}</label>
+      <input
+        type={type}
+        value={cfg[key]}
+        onChange={e => u(key, e.target.value)}
+        placeholder={placeholder}
+        style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #e2e8f0", borderRadius: 8, fontSize: 13, color: "#1a365d", boxSizing: "border-box" }}
+      />
+    </div>
+  );
+
+  return (
+    <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
+      <div style={{ fontWeight: 700, fontSize: 14, color: "#1a365d", marginBottom: 14, borderBottom: "2px solid #ebf8ff", paddingBottom: 7 }}>
+        🇨🇱 Datos Tributarios (SII Chile)
+      </div>
+
+      {/* Tipo contribuyente */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: "#718096", fontWeight: 700, marginBottom: 8 }}>Tipo de contribuyente</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {[
+            { val: "empresa",        label: "🏢 Empresa (SpA / Ltda)",         desc: "Emite Facturas — IVA 19%" },
+            { val: "persona_natural", label: "👤 Persona Natural",               desc: "Emite Boletas de Honorarios — Retención 10%" },
+          ].map(({ val, label, desc }) => (
+            <button key={val} onClick={() => u("tipoContribuyente", val)}
+              style={{
+                flex: 1, padding: "10px 14px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+                border: cfg.tipoContribuyente === val ? "2px solid #2b6cb0" : "2px solid #e2e8f0",
+                background: cfg.tipoContribuyente === val ? "#ebf8ff" : "#f7fafc",
+              }}>
+              <div style={{ fontWeight: 700, fontSize: 12, color: cfg.tipoContribuyente === val ? "#2b6cb0" : "#2d3748", marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 10, color: "#718096" }}>{desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Campi fiscali */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        {inp("RUT Emisor *", "rut", "12.345.678-9")}
+        {inp("Razón Social *", "razonSocial", "Mi Empresa SpA")}
+        {inp("Giro *", "giro", "Construcción y Remodelación")}
+        {inp("Ciudad", "ciudad", "Santiago")}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 12 }}>
+        {inp("Dirección", "direccion", "Av. Providencia 1234, Of. 56")}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+        {inp("Teléfono", "telefono", "+56 9 1234 5678")}
+        {inp("Email tributario", "email", "contacto@empresa.cl", "email")}
+      </div>
+
+      {/* Info IVA / Retención */}
+      <div style={{
+        background: cfg.tipoContribuyente === "empresa" ? "#ebf8ff" : "#faf5ff",
+        border: `1px solid ${cfg.tipoContribuyente === "empresa" ? "#bee3f8" : "#d6bcfa"}`,
+        borderRadius: 9, padding: "10px 14px", marginBottom: 16, fontSize: 12,
+      }}>
+        {cfg.tipoContribuyente === "empresa" ? (
+          <>
+            <div style={{ fontWeight: 700, color: "#2b6cb0", marginBottom: 3 }}>📋 Régimen Empresa (SpA/Ltda)</div>
+            <div style={{ color: "#2d3748" }}>Los DTE generarán <strong>IVA 19%</strong> separado. Las facturas mostrarán Neto + IVA + Total.</div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontWeight: 700, color: "#553c9a", marginBottom: 3 }}>📋 Régimen Persona Natural (Honorarios)</div>
+            <div style={{ color: "#2d3748" }}>Las boletas aplicarán <strong>retención 10%</strong> automática. El cliente retiene y paga al SII en tu nombre.</div>
+          </>
+        )}
+      </div>
+
+      <button onClick={handleSave}
+        style={{ padding: "10px 22px", background: saved ? "#276749" : "#1a365d", color: "white", border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 13, transition: "all .2s" }}>
+        {saved ? "✅ Datos guardados" : "💾 Guardar datos tributarios"}
+      </button>
+    </div>
+  );
+}
+
 // ─── Sezione personalizzazione PDF ───────────────────────────────────────────
 function PDFSettingsSection({ plan = "free", onGoToPiani }) {
   const isPro = plan === "pro" || plan === "team" || plan === "enterprise";
@@ -168,9 +290,85 @@ function PDFSettingsSection({ plan = "free", onGoToPiani }) {
 }
 
 // ─── TabSettings principal ────────────────────────────────────────────────────
+// ─── 4.6 Componente Referral ──────────────────────────────────────────────────
+function ReferralCard({ workspace, userEmail, onToast }) {
+  const [copied, setCopied] = useState(false);
+
+  // Genera codice stabile basato sull'ID workspace (no round-trip al server)
+  const code = workspace?.id
+    ? "ON-" + workspace.id.slice(0, 6).toUpperCase()
+    : null;
+
+  const referralUrl = code
+    ? `${window.location.origin}?ref=${code}`
+    : null;
+
+  const handleCopy = () => {
+    if (!referralUrl) return;
+    navigator.clipboard?.writeText(referralUrl).then(() => {
+      setCopied(true);
+      onToast?.("✅ Link copiado");
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => onToast?.("⚠️ No se pudo copiar"));
+  };
+
+  const handleWA = () => {
+    if (!referralUrl) return;
+    const msg = encodeURIComponent(
+      `Te recomiendo Obra Nova para gestionar presupuestos de construcción 🏗️\n\nRegístrate con mi link y ambos conseguimos 30 días Pro gratis:\n${referralUrl}`
+    );
+    window.open(`https://wa.me/?text=${msg}`, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <div style={{ background: "linear-gradient(135deg,#276749,#2d6a4f)", borderRadius: 14, padding: "20px 22px", color: "white" }}>
+      <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}>🎁 Invita y gana 30 días Pro</div>
+      <div style={{ fontSize: 12, color: "rgba(255,255,255,.75)", marginBottom: 16, maxWidth: 420 }}>
+        Comparte tu link. Por cada amigo que se registre y active un plan Pro, <strong>ambos</strong> reciben 30 días extra de Pro gratis.
+      </div>
+
+      {code ? (
+        <>
+          {/* Link copiabile */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+            <div style={{ flex: 1, minWidth: 200, background: "rgba(255,255,255,.12)", borderRadius: 9,
+              padding: "9px 12px", fontSize: 12, fontWeight: 700, fontFamily: "monospace",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {referralUrl}
+            </div>
+            <button onClick={handleCopy}
+              style={{ padding: "9px 16px", background: copied ? "rgba(255,255,255,.3)" : "rgba(255,255,255,.15)",
+                border: "1px solid rgba(255,255,255,.3)", borderRadius: 9, color: "white",
+                cursor: "pointer", fontWeight: 700, fontSize: 12, flexShrink: 0, transition: "background .2s" }}>
+              {copied ? "✅ Copiado" : "📋 Copiar"}
+            </button>
+            <button onClick={handleWA}
+              style={{ padding: "9px 16px", background: "#25D366", border: "none", borderRadius: 9,
+                color: "white", cursor: "pointer", fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
+              💬 WhatsApp
+            </button>
+          </div>
+
+          {/* Código destacado */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,.6)" }}>Tu código:</div>
+            <div style={{ background: "rgba(255,255,255,.18)", borderRadius: 7, padding: "4px 12px",
+              fontSize: 14, fontWeight: 900, letterSpacing: 2, fontFamily: "monospace" }}>
+              {code}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,.6)" }}>Crea un workspace para obtener tu link de referido.</div>
+      )}
+    </div>
+  );
+}
+
 export default function TabSettings({
   workspace, members, myRole, can,
   onInvite, onChangeRole, onRemoveMember, onUpdateName, onGoToPiani,
+  user, onToast,
 }) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole,  setInviteRole]  = useState(ROLES.MEMBER);
@@ -235,6 +433,9 @@ export default function TabSettings({
           )}
         </div>
       </div>
+
+      {/* ── Datos Tributarios SII ─────────────────────────────────────────── */}
+      <DatosTributariosSection />
 
       {/* ── Personalizzazione PDF ──────────────────────────────────────────── */}
       <PDFSettingsSection plan={workspace?.plan} onGoToPiani={onGoToPiani} />
@@ -349,6 +550,10 @@ export default function TabSettings({
           </button>
         )}
       </div>
+
+      {/* 4.6 Referral */}
+      <ReferralCard workspace={workspace} userEmail={user?.email} onToast={onToast} />
+
     </div>
   );
 }

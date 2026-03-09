@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+    function isMember(wsId) {
+      return isAuth() && exists(/databases/$(database)/documents/workspaces/$(wsId)/members/$(request.auth.uid));
+    }
+    function isOwner(wsId) {
+      return isAuth() && get(/databases/$(database)/documents/workspaces/$(wsId)).data.ownerId == request.auth.uid;
+    }
+
+    match /workspaces/{workspaceId} {
+      allow read:   if isMember(workspaceId);
+      allow create: if isAuth();
+      allow update: if isMember(workspaceId);
+      allow delete: if isOwner(workspaceId);
+
+      match /members/{memberId} {
+        allow read:   if isMember(workspaceId);
+        allow write:  if isOwner(workspaceId) || request.auth.uid == memberId;
+      }
+      match /proyectos/{docId}   { allow read, write: if isMember(workspaceId); }
+      match /magazzino/{docId}   { allow read, write: if isMember(workspaceId); }
+      match /movimenti/{docId}   { allow read, write: if isMember(workspaceId); }
+      match /listino/{docId}     { allow read, write: if isMember(workspaceId); }
+      match /cats/{docId}        { allow read, write: if isMember(workspaceId); }
+      match /fatture/{docId}     { allow read, write: if isMember(workspaceId); }
+      match /prezzi_ml/{docId}   { allow read, write: if isMember(workspaceId); }
+      match /firme/{tokenId}     { allow read, write: if true; }
+    }
+
+    match /tokens_firma/{tokenId} {
+      allow read:  if true;
+      allow write: if isAuth();
+    }
+    match /invites/{inviteId} {
+      allow read:   if isAuth() && (
+        resource.data.invitedEmail == request.auth.token.email ||
+        resource.data.invitedBy    == request.auth.uid
+      );
+      allow create: if isAuth();
+      allow update: if isAuth() && resource.data.invitedEmail == request.auth.token.email;
+      allow delete: if isAuth() && resource.data.invitedBy == request.auth.uid;
+    }
+    match /users/{userId}/{document=**} {
+      allow read, write: if isAuth() && request.auth.uid == userId;
+    }
+    match /mp_payments/{docId} {
+      allow read: if false;
+      allow write: if false;
+    }
+  }
+}

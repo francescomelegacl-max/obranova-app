@@ -537,7 +537,7 @@ function ProyectoCard({ p, isActive, onLoad, onDelete, onPDF, t }) {
   );
 }
 
-export function TabProyectos({ proyectos, currentId, onLoad, onDelete, onPDF, t }) {
+export function TabProyectos({ proyectos, currentId, onLoad, onDelete, onPDF, t, canPlan, onPaywall }) {
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768);
   const [search,       setSearch]       = useState("");
   const [filterEstado, setFilterEstado] = useState("Todos");
@@ -723,7 +723,7 @@ export function TabProyectos({ proyectos, currentId, onLoad, onDelete, onPDF, t 
                   <div style={{ fontSize: 10, color: "#a0aec0" }}>{(p.updatedAt || "").slice(0, 10)}</div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button onClick={e => { e.stopPropagation(); onPDF(p); }}
+                  <button onClick={e => { e.stopPropagation(); canPlan && !canPlan("firma") ? onPaywall?.("firma") : onPDF(p); }}
                     style={{ flex: 1, padding: "5px", background: "#ebf8ff", border: "1px solid #bee3f8", borderRadius: 7, cursor: "pointer", color: "#2b6cb0", fontSize: 11, fontWeight: 600 }}>
                     🖨️ PDF
                   </button>
@@ -742,10 +742,136 @@ export function TabProyectos({ proyectos, currentId, onLoad, onDelete, onPDF, t 
 }
 
 // ─── TabListino ───────────────────────────────────────────────────────────────
-export function TabListino({ listino, cats, catColors, newCatName, setNewCatName, onAddCat, onDeleteItem, onAddFromListino, onOpenAddModal, DEFAULT_CATS, t }) {
-  const [filterCat, setFilterCat] = useState(null);
-  const [search,    setSearch]    = useState("");
-  const [isMobile,  setIsMobile]  = useState(() => window.innerWidth < 768);
+// ─── 3.4 Comparativo Proveedores ─────────────────────────────────────────────
+function ComparativoProveedores({ listino, cats, catColors, t }) {
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("nombre"); // nombre | precioCompra | margen
+
+  // Raggruppa articoli per nome e mostra tutti i provider con prezzi
+  const grouped = useMemo(() => {
+    const map = {};
+    listino.forEach(item => {
+      const key = (item.nombre || "").toLowerCase().trim();
+      if (!key) return;
+      if (!map[key]) map[key] = { nombre: item.nombre, cat: item.cat, unidad: item.unidad, items: [] };
+      map[key].items.push(item);
+    });
+    // Calcola stats per gruppo
+    return Object.values(map).map(g => {
+      const precios = g.items.map(x => x.precioCompra || 0).filter(p => p > 0);
+      const min     = precios.length ? Math.min(...precios) : 0;
+      const max     = precios.length ? Math.max(...precios) : 0;
+      const avg     = precios.length ? precios.reduce((a,b)=>a+b,0)/precios.length : 0;
+      const spread  = min > 0 ? Math.round((max - min) / min * 100) : 0;
+      return { ...g, min, max, avg, spread, nProveedores: new Set(g.items.map(x=>x.proveedor||"—")).size };
+    });
+  }, [listino]);
+
+  const filtered = useMemo(() => {
+    let list = [...grouped];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(g => g.nombre.toLowerCase().includes(q) || g.cat?.toLowerCase().includes(q));
+    }
+    if (sortBy === "nombre")       list.sort((a,b) => a.nombre.localeCompare(b.nombre));
+    if (sortBy === "precioCompra") list.sort((a,b) => b.avg - a.avg);
+    if (sortBy === "margen")       list.sort((a,b) => b.spread - a.spread);
+    return list;
+  }, [grouped, search, sortBy]);
+
+  const fmtCLP = n => n > 0 ? "$ " + Math.round(n).toLocaleString("es-CL") : "—";
+
+  if (listino.length === 0) return (
+    <div style={{ background:"white", borderRadius:12, padding:"40px 20px", textAlign:"center", color:"#a0aec0" }}>
+      <div style={{ fontSize:36, marginBottom:10 }}>📊</div>
+      <div style={{ fontWeight:700, fontSize:14 }}>Sin datos para comparar</div>
+      <div style={{ fontSize:12, marginTop:4 }}>Agrega artículos al listino con sus precios y proveedores</div>
+    </div>
+  );
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+      {/* Info */}
+      <div style={{ background:"#ebf8ff", border:"1px solid #bee3f8", borderRadius:10, padding:"10px 16px", fontSize:12, color:"#2b6cb0" }}>
+        📊 Compara precios de compra entre proveedores para el mismo material. Los artículos con mayor diferencia de precio están arriba.
+      </div>
+
+      {/* Toolbar */}
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+        <div style={{ flex:1, minWidth:200, position:"relative" }}>
+          <span style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", fontSize:13, color:"#a0aec0" }}>🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar material..."
+            style={{ width:"100%", padding:"8px 10px 8px 30px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:12, color:"#1a365d", boxSizing:"border-box" }}
+          />
+        </div>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+          style={{ padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:12, color:"#1a365d" }}>
+          <option value="nombre">Nombre A-Z</option>
+          <option value="precioCompra">Mayor precio promedio</option>
+          <option value="margen">Mayor diferencia %</option>
+        </select>
+      </div>
+
+      {/* Tabla */}
+      <div style={{ background:"white", borderRadius:12, overflow:"hidden", boxShadow:"0 1px 4px rgba(0,0,0,.07)" }}>
+        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
+          <thead>
+            <tr style={{ background:"#1a365d", color:"white" }}>
+              {["Material","Cat","Mín","Máx","Promedio","Diferencia","Proveedores"].map(h => (
+                <th key={h} style={{ padding:"9px 10px", textAlign:"left", fontWeight:600, fontSize:11, whiteSpace:"nowrap" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 && (
+              <tr><td colSpan={7} style={{ padding:"24px", textAlign:"center", color:"#a0aec0" }}>Sin resultados</td></tr>
+            )}
+            {filtered.map((g, i) => (
+              <tr key={g.nombre} style={{ background: i%2===0?"#f7fafc":"white", borderBottom:"1px solid #f0f4f8" }}>
+                <td style={{ padding:"8px 10px", fontWeight:700, color:"#1a365d" }}>{g.nombre}</td>
+                <td style={{ padding:"8px 8px" }}>
+                  <span style={{ fontSize:10, padding:"2px 7px", borderRadius:99, fontWeight:700,
+                    background:"#ebf8ff", color:"#2b6cb0" }}>{g.cat||"—"}</span>
+                </td>
+                <td style={{ padding:"8px 10px", color:"#276749", fontWeight:700 }}>{fmtCLP(g.min)}</td>
+                <td style={{ padding:"8px 10px", color:"#c53030", fontWeight:700 }}>{fmtCLP(g.max)}</td>
+                <td style={{ padding:"8px 10px", color:"#4a5568" }}>{fmtCLP(g.avg)}</td>
+                <td style={{ padding:"8px 10px" }}>
+                  {g.spread > 0 ? (
+                    <span style={{ padding:"2px 9px", borderRadius:99, fontSize:11, fontWeight:800,
+                      background: g.spread > 30 ? "#fff5f5" : g.spread > 10 ? "#fffff0" : "#f0fff4",
+                      color:      g.spread > 30 ? "#c53030" : g.spread > 10 ? "#b7791f" : "#276749" }}>
+                      +{g.spread}%
+                    </span>
+                  ) : <span style={{ color:"#a0aec0" }}>—</span>}
+                </td>
+                <td style={{ padding:"8px 10px", color:"#718096" }}>
+                  <button
+                    style={{ background:"none", border:"none", cursor:"pointer", color:"#2b6cb0", fontSize:11, fontWeight:600, padding:0 }}
+                    onClick={() => {
+                      const provs = [...new Set(g.items.map(x=>x.proveedor||"—"))];
+                      alert(`Proveedores para ${g.nombre}:\n\n${g.items.map(x=>`${x.proveedor||"—"}: ${fmtCLP(x.precioCompra||0)} / ${x.unidad||"un"}`).join("\n")}`);
+                    }}>
+                    {g.nProveedores} {g.nProveedores === 1 ? "proveedor" : "proveedores"} →
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export function TabListino({ listino, cats, catColors, newCatName, setNewCatName, onAddCat, onDeleteItem, onAddFromListino, onOpenAddModal, DEFAULT_CATS, t, onUpdatePrecio }) {
+  const [filterCat,    setFilterCat]    = useState(null);
+  const [search,       setSearch]       = useState("");
+  const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768);
+  const [vistaTab,     setVistaTab]     = useState("listino"); // "listino" | "comparativo"
+  // 2.10 Edit inline prezzi
+  const [editingPrice, setEditingPrice] = useState(null); // { id, field, value }
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", h);
@@ -785,14 +911,32 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-      {/* Header */}
+      {/* Header con tab switcher */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: "#1a365d" }}>📦 {t.listino} ({listino.length})</div>
+        <div style={{ display: "flex", gap: 4, background: "#f0f4f8", borderRadius: 10, padding: 4 }}>
+          {[["listino","📦 Listino"],["comparativo","📊 Comparativo"]].map(([v,label]) => (
+            <button key={v} onClick={() => setVistaTab(v)}
+              style={{ padding: "6px 14px", borderRadius: 7, border: "none", cursor: "pointer",
+                fontWeight: 700, fontSize: 12,
+                background: vistaTab === v ? "#1a365d" : "transparent",
+                color:      vistaTab === v ? "white" : "#718096" }}>
+              {label}
+            </button>
+          ))}
+        </div>
         <button onClick={onOpenAddModal}
           style={{ padding: "8px 16px", background: "#276749", color: "white", border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
           {t.listinoAgregar}
         </button>
       </div>
+
+      {/* ── Vista Comparativo Proveedores ─────────────────────────────────── */}
+      {vistaTab === "comparativo" && (
+        <ComparativoProveedores listino={listino} cats={cats} catColors={catColors} t={t} />
+      )}
+
+      {/* ── Vista Listino (originale) ─────────────────────────────────────── */}
+      {vistaTab === "listino" && (<>
 
       {/* Barra filtri + ricerca */}
       <div style={{ background: "white", borderRadius: 12, padding: "14px 16px", boxShadow: "0 1px 4px rgba(0,0,0,.07)", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -986,8 +1130,42 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
                       </td>
                       <td style={{ padding: "7px 10px", fontWeight: 600, color: "#1a365d" }}>{item.nombre}</td>
                       <td style={{ padding: "7px 8px", color: "#718096" }}>{item.unidad || "—"}</td>
-                      <td style={{ padding: "7px 10px", color: "#c05621", fontWeight: 600 }}>{item.precioCompra > 0 ? fmt(item.precioCompra) : "—"}</td>
-                      <td style={{ padding: "7px 10px", color: "#276749", fontWeight: 700 }}>{item.precioCliente > 0 ? fmt(item.precioCliente) : item.precio > 0 ? fmt(item.precio) : "—"}</td>
+                      <td style={{ padding: "7px 10px", color: "#c05621", fontWeight: 600 }}>
+                        {/* 2.10 Edit inline doppio click — precioCompra */}
+                        {onUpdatePrecio && editingPrice?.id === item.id && editingPrice?.field === "precioCompra" ? (
+                          <input autoFocus type="number" min={0}
+                            value={editingPrice.value}
+                            onChange={e => setEditingPrice(ep => ({ ...ep, value: e.target.value }))}
+                            onBlur={() => { onUpdatePrecio(item.id, "precioCompra", +editingPrice.value); setEditingPrice(null); }}
+                            onKeyDown={e => { if (e.key === "Enter") { onUpdatePrecio(item.id, "precioCompra", +editingPrice.value); setEditingPrice(null); } if (e.key === "Escape") setEditingPrice(null); }}
+                            style={{ width: 90, padding: "3px 6px", border: "2px solid #c05621", borderRadius: 6, fontSize: 12, color: "#c05621", fontWeight: 700, textAlign: "right" }} />
+                        ) : (
+                          <span
+                            onDoubleClick={() => onUpdatePrecio && setEditingPrice({ id: item.id, field: "precioCompra", value: item.precioCompra || 0 })}
+                            title={onUpdatePrecio ? "Doble click para editar" : ""}
+                            style={{ cursor: onUpdatePrecio ? "pointer" : "default", borderBottom: onUpdatePrecio ? "1px dashed #c05621" : "none" }}>
+                            {item.precioCompra > 0 ? fmt(item.precioCompra) : "—"}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ padding: "7px 10px", color: "#276749", fontWeight: 700 }}>
+                        {/* 2.10 Edit inline doppio click — precioCliente */}
+                        {onUpdatePrecio && editingPrice?.id === item.id && editingPrice?.field === "precioCliente" ? (
+                          <input autoFocus type="number" min={0}
+                            value={editingPrice.value}
+                            onChange={e => setEditingPrice(ep => ({ ...ep, value: e.target.value }))}
+                            onBlur={() => { onUpdatePrecio(item.id, "precioCliente", +editingPrice.value); setEditingPrice(null); }}
+                            onKeyDown={e => { if (e.key === "Enter") { onUpdatePrecio(item.id, "precioCliente", +editingPrice.value); setEditingPrice(null); } if (e.key === "Escape") setEditingPrice(null); }}
+                            style={{ width: 90, padding: "3px 6px", border: "2px solid #276749", borderRadius: 6, fontSize: 12, color: "#276749", fontWeight: 700, textAlign: "right" }} />
+                        ) : (
+                          <span
+                            onDoubleClick={() => onUpdatePrecio && setEditingPrice({ id: item.id, field: "precioCliente", value: item.precioCliente || item.precio || 0 })}
+                            title={onUpdatePrecio ? "Doble click para editar" : ""}
+                            style={{ cursor: onUpdatePrecio ? "pointer" : "default", borderBottom: onUpdatePrecio ? "1px dashed #276749" : "none" }}>
+                            {item.precioCliente > 0 ? fmt(item.precioCliente) : item.precio > 0 ? fmt(item.precio) : "—"}
+                          </span>
+                        )}
+                      </td>
                       <td style={{ padding: "7px 8px" }}>
                         {mg !== null ? (
                           <span style={{ padding: "2px 8px", borderRadius: 99, fontSize: 11, fontWeight: 700,
@@ -1019,17 +1197,27 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
           </table>
         </div>
       )}
+      </>)}{/* fine vistaTab === listino */}
     </div>
   );
 }
 
 
 // ─── TabStorico ───────────────────────────────────────────────────────────────
-export function TabStorico({ proyectos, t }) {
+export function TabStorico({ proyectos, t, canPlan, onPaywall }) {
   const [search, setSearch] = useState("");
 
+  // 4.1 Filtra storico per piano: Free = ultimi 60gg, Pro = illimitato
+  const proyectosFiltrati = useMemo(() => {
+    if (!canPlan || canPlan("historialDays") !== false) return proyectos;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 60);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    return proyectos.filter(p => (p.info?.fecha || p.updatedAt || "") >= cutoffStr);
+  }, [proyectos, canPlan]);
+
   const storicoMat = useMemo(() => Object.values(
-    proyectos.reduce((acc, proj) => {
+    proyectosFiltrati.reduce((acc, proj) => {
       (proj.partidas || []).forEach(p => {
         if (!p.nombre?.trim()) return;
         const k = p.nombre.toLowerCase().trim();
@@ -1062,6 +1250,21 @@ export function TabStorico({ proyectos, t }) {
         <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 3 }}>📈 {t.storicoTitulo}</div>
         <div style={{ color: "#a0aec0", fontSize: 12 }}>{t.storicoDesc}</div>
       </div>
+      {/* 4.1 Banner storico limitato nel Free */}
+      {canPlan && !canPlan("historialDays") && (
+        <div style={{ background: "#fffff0", border: "1px solid #f6e05e", borderRadius: 10, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 18 }}>⏳</span>
+            <span style={{ fontSize: 12, color: "#744210", fontWeight: 700 }}>
+              Plan Free — histórico limitado a los últimos 60 días
+            </span>
+          </div>
+          <button onClick={() => onPaywall?.("historialDays")}
+            style={{ padding: "5px 14px", background: "#b7791f", color: "white", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 11, flexShrink: 0 }}>
+            Ver Pro →
+          </button>
+        </div>
+      )}
       {/* Barra ricerca */}
       <div style={{ position: "relative" }}>
         <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#a0aec0" }}>🔍</span>

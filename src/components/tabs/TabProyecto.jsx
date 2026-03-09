@@ -19,12 +19,23 @@ export default function TabProyecto({
   const [showTemplates,   setShowTemplates]   = useState(false);
   const [templateApplied, setTemplateApplied] = useState("");
   const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 767px)").matches);
+  // 2.4 Validazione
+  const [touched, setTouched] = useState({});
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
     const handler = (e) => setIsMobile(e.matches);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
+
+  // 2.4 Regole di validazione
+  const validators = {
+    cliente:    v => !v?.trim() ? "El nombre del cliente es obligatorio" : null,
+    email:      v => v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "Email no válido" : null,
+    telefono:   v => v && !/^(\+?56)?[ -]?(9\d{8})$/.test(v.replace(/\s/g,"")) ? "Formato esperado: +569XXXXXXXX" : null,
+  };
+  const getError = (field) => touched[field] ? validators[field]?.(info[field]) : null;
+  const handleBlur = (field) => setTouched(t => ({ ...t, [field]: true }));
   const venceDate = info.fecha
     ? new Date(new Date(info.fecha).getTime() + validez * 86400000).toLocaleDateString("es-CL")
     : "—";
@@ -100,20 +111,34 @@ export default function TabProyecto({
           { k: "referencia", l: t.referencia,           ph: t.referenciaPlaceholder },
           { k: "telefono",   l: t.telefono },
           { k: "email",      l: t.email, type: "email" },
-        ].map(f => (
-          <div key={f.k} style={{ marginBottom: 10 }}>
-            <label style={labelStyle}>
-              {f.l}{f.tip && <Tip text={f.tip} />}
-            </label>
-            <input
-              value={info[f.k] || ""}
-              onChange={e => setInfo({ [f.k]: e.target.value })}
-              type={f.type || "text"}
-              placeholder={f.ph || ""}
-              style={inputStyle}
-            />
-          </div>
-        ))}
+        ].map(f => {
+          const err = getError(f.k);
+          return (
+            <div key={f.k} style={{ marginBottom: 10 }}>
+              <label style={labelStyle}>
+                {f.l}{f.tip && <Tip text={f.tip} />}
+                {f.k === "cliente" && <span style={{ color: "#c53030", marginLeft: 2 }}>*</span>}
+              </label>
+              <input
+                value={info[f.k] || ""}
+                onChange={e => setInfo({ [f.k]: e.target.value })}
+                onBlur={() => handleBlur(f.k)}
+                type={f.type || "text"}
+                placeholder={f.ph || (f.k === "telefono" ? "+569XXXXXXXX" : "")}
+                style={{
+                  ...inputStyle,
+                  border: err ? "1px solid #fc8181" : "1px solid #e2e8f0",
+                  background: err ? "#fff5f5" : "white",
+                }}
+              />
+              {err && (
+                <div style={{ fontSize: 11, color: "#c53030", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                  ⚠️ {err}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Obra + Fechas */}
@@ -147,6 +172,16 @@ export default function TabProyecto({
             <div style={{ flex: 1 }}>
               <label style={labelStyle}>{t.validez}</label>
               <input type="number" value={validez} onChange={e => setValidez(parseInt(e.target.value) || 30)} min={1} style={inputStyle} />
+            </div>
+            {/* 3.9 Multi-moneda */}
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Moneda</label>
+              <select value={info.moneda || "CLP"} onChange={e => setInfo({ moneda: e.target.value })} style={inputStyle}>
+                <option value="CLP">🇨🇱 CLP — Peso chileno</option>
+                <option value="USD">🇺🇸 USD — Dólar</option>
+                <option value="UF">📈 UF — Unidad de Fomento</option>
+                <option value="EUR">🇪🇺 EUR — Euro</option>
+              </select>
             </div>
             <div style={{ flex: 1 }}>
               <label style={{ ...labelStyle, color: "#718096" }}>{t.vence}</label>
