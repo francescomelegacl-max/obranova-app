@@ -146,13 +146,26 @@ export default function PaginaFirma({ token }) {
           setFirma(firmaData); setStep("rifiutato"); setLoading(false); return;
         }
 
-        // Carica progetto
-        const proyRef  = doc(db, `workspaces/${workspaceId}/proyectos/${proyectoId}`);
-        const proySnap = await getDoc(proyRef);
-        if (!proySnap.exists()) { setErrore("Preventivo non trovato"); setLoading(false); return; }
+        // Usa snapshot salvato nel documento firma (non richiede auth)
+        // Fallback: tenta lettura diretta proyectos (per firme vecchie senza snapshot)
+        if (firmaData.proyectoSnapshot) {
+          setFirma(firmaData);
+          setProyecto({ id: proyectoId, ...firmaData.proyectoSnapshot });
+          setLoading(false);
+          return;
+        }
 
-        setFirma(firmaData);
-        setProyecto({ id: proySnap.id, ...proySnap.data() });
+        // Fallback per firme create prima di questo fix
+        try {
+          const proyRef  = doc(db, `workspaces/${workspaceId}/proyectos/${proyectoId}`);
+          const proySnap = await getDoc(proyRef);
+          setFirma(firmaData);
+          setProyecto(proySnap.exists() ? { id: proySnap.id, ...proySnap.data() } : null);
+        } catch {
+          // Se le rules bloccano (utente non autenticato), usa solo i dati della firma
+          setFirma(firmaData);
+          setProyecto(null);
+        }
         setLoading(false);
       } catch (e) {
         console.error(e);

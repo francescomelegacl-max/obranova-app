@@ -15,12 +15,12 @@
 
 import { useState } from "react";
 
-const MP_PRO_MENSUAL     = "https://mpago.la/TULINK_PRO";
-const MP_TEAM_MENSUAL    = "https://mpago.la/TULINK_TEAM";
-const MP_ACTIVACION_PRO  = "https://mpago.la/TULINK_ACT_PRO";
-const MP_ACTIVACION_TEAM = "https://mpago.la/TULINK_ACT_TEAM";
-const MP_MIGRACION       = "https://mpago.la/TULINK_MIGRACION";
-const WA_CONTACTO        = "https://wa.me/56900000000?text=Hola,%20quiero%20saber%20más%20sobre%20Obra%20Nova";
+const MP_PRO_MENSUAL     = "https://www.mercadopago.cl/subscriptions/checkout?preapproval_plan_id=fbc34629c1804f40bcca719a35ba98a9";
+const MP_TEAM_MENSUAL    = "https://www.mercadopago.cl/subscriptions/checkout?preapproval_plan_id=09454623a1ec499285b8283b6564db83";
+const MP_ACTIVACION_PRO  = "https://mpago.la/1ewvFoK";
+const MP_ACTIVACION_TEAM = "https://mpago.la/2pRjtTu";
+const MP_MIGRACION       = "https://mpago.la/2XYHN2u";
+const WA_CONTACTO        = "https://wa.me/56974264216?text=Hola,%20quiero%20saber%20más%20sobre%20Obra%20Nova";
 
 // ── Definición de planes ──────────────────────────────────────────────────────
 const PIANI = [

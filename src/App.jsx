@@ -10,6 +10,7 @@ import { useMagazzino }                     from "./hooks/useMagazzino";
 import { useFirma }                         from "./hooks/useFirma";
 import { useFatture }                       from "./hooks/useFatture";
 import { usePlan }                          from "./hooks/usePlan";
+import { useAnalytics }                     from "./hooks/useAnalytics";
 import PaywallModal                         from "./components/PaywallModal";
 
 import T                                    from "./i18n/translations";
@@ -106,7 +107,7 @@ export default function App() {
   } = useWorkspace({ onToast: showToast });
 
   const [paywallFeature, setPaywallFeature] = useState(null);
-  const openPaywall  = useCallback((feature) => setPaywallFeature(feature), []);
+  const openPaywall  = useCallback((feature) => { setPaywallFeature(feature); trackPaywallShown(feature); }, [trackPaywallShown]);
   const closePaywall = useCallback(() => setPaywallFeature(null), []);
 
   const {
@@ -117,6 +118,19 @@ export default function App() {
   } = useFirestore({ onToast: showToast, workspaceId: workspace?.id });
 
   const { canPlan, canUse, canCreateProyecto, plan, isPro, isTrialActive, trialDaysLeft, proyectosRestantes } = usePlan({ workspace }, proyectos);
+
+  const { trackProyectoCreado, trackPdfGenerado, trackFirmaSolicitada, trackPaywallShown, trackUpgradeClick, trackTrialStarted } = useAnalytics({ workspace, plan, isTrialActive });
+
+  // Traccia trial_started una volta sola per workspace (usa sessionStorage come flag)
+  useEffect(() => {
+    if (isTrialActive && workspace?.id) {
+      const key = `trial_tracked_${workspace.id}`;
+      if (!sessionStorage.getItem(key)) {
+        trackTrialStarted();
+        sessionStorage.setItem(key, "1");
+      }
+    }
+  }, [isTrialActive, workspace?.id]);
 
   const {
     items: magItems, movimenti, itemsInAlert, loading: magLoading,
@@ -209,7 +223,7 @@ export default function App() {
     return () => clearTimeout(saveTimer.current);
   }, [proy]); // eslint-disable-line
 
-  const handleNewProject     = async () => { if (!canCreateProyecto()) { openPaywall("maxProyectos"); return; } const id = await newProyecto(); if (id) { dispatch({ type:"NEW_PROJECT", payload:id }); setTab(2); } };
+  const handleNewProject     = async () => { if (!canCreateProyecto()) { openPaywall("maxProyectos"); return; } const id = await newProyecto(); if (id) { dispatch({ type:"NEW_PROJECT", payload:id }); setTab(2); trackProyectoCreado(id); } };
   const handleSaveManual     = () => saveProyecto(proy.currentId, proy, true);
   const handleOpenProject    = (p) => { loadProject(p); setTab(2); };
   const handleOpenPDF        = (p) => { loadProject(p); setTab(7); };
@@ -252,7 +266,7 @@ export default function App() {
       condPagoPersonalizado: proy.condPagoPersonalizado,
     };
     const result = await creaLinkFirma(proy.currentId, proy.info, 7, snapshot);
-    if (result) copiaLink(result.url);
+    if (result) { copiaLink(result.url); trackFirmaSolicitada(); }
   };
 
   const handleAcceptInvite    = async (invite) => {
@@ -371,7 +385,7 @@ export default function App() {
         <PaywallModal
           feature={paywallFeature}
           onClose={closePaywall}
-          onGoToPiani={() => { closePaywall(); setTab(15); }}
+          onGoToPiani={() => { closePaywall(); setTab(15); trackUpgradeClick("paywall"); }}
         />
       )}
       {showOnboarding  && <ModalOnboarding t={t} onClose={() => setShowOnboarding(false)} />}
@@ -635,7 +649,7 @@ export default function App() {
             {tab===4  && <TabCalcolatore listino={listino} addPartida={addFromListino} cats={cats} onToast={showToast} />}
             {tab===5  && <TabKitMateriali kits={kits} cargando={cargandoKits} onSaveKit={saveKit} onDeleteKit={deleteKit} onImportarPredefinito={importarKitPredefinito} addPartida={addFromListino} cats={cats} onToast={showToast} />}
             {tab===6  && <TabResumen partidas={proy.partidas} pct={proy.pct} cats={cats} iva={proy.iva} t={t} />}
-            {tab===7  && <TabVistaCliente info={proy.info} partidas={proy.partidas} pct={proy.pct} cats={cats} catVis={proy.catVis} getCatVis={getCatVis} setCatVisKey={setCatVisKey} iva={proy.iva} estado={proy.estado} currentId={proy.currentId} validez={proy.validez} t={t} onInviaFirma={handleInviaFirma} firme={firme} plan={workspace?.plan} />}
+            {tab===7  && <TabVistaCliente info={proy.info} partidas={proy.partidas} pct={proy.pct} cats={cats} catVis={proy.catVis} getCatVis={getCatVis} setCatVisKey={setCatVisKey} iva={proy.iva} estado={proy.estado} currentId={proy.currentId} validez={proy.validez} t={t} onInviaFirma={handleInviaFirma} firme={firme} plan={workspace?.plan} onTrackPdf={trackPdfGenerado} />}
             {tab===8  && <TabListino listino={listino} cats={cats} catColors={CAT_COLORS} newCatName={newCatName} setNewCatName={setNewCatName} onAddCat={() => { addCat(newCatName,t); setNewCatName(""); }} onDeleteItem={deleteListinoItem} onAddFromListino={handleAddFromListino} onOpenAddModal={() => setShowAddListino(true)} DEFAULT_CATS={DEFAULT_CATS} t={t} onUpdatePrecio={async (id, field, value) => { await updatePrezzoManuale(id, { [field]: value }); await loadListino(); }} />}
             {tab===9  && <TabMagazzino items={magItems} movimenti={movimenti} itemsInAlert={itemsInAlert} loading={magLoading} cats={cats} proyectos={proyectos} onSaveItem={saveMagItem} onDeleteItem={deleteMagItem} onMovimento={registraMovimento} />}
             {tab===10 && (!canUse("fatture") ? <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:300}}><button onClick={()=>openPaywall("fatture")} style={{padding:"16px 32px",background:"linear-gradient(135deg,#2b6cb0,#553c9a)",color:"white",border:"none",borderRadius:12,cursor:"pointer",fontWeight:800,fontSize:15}}>⚡ Activar Facturas Pro</button></div> : <TabFatture proyectos={proyectos} fatture={fatture} onCreaFattura={creaFattura} onTogglePagata={togglePagata} onEliminaFattura={eliminaFattura} />)}

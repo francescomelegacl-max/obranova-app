@@ -27,7 +27,7 @@ export function useFirma({ workspaceId, onToast }) {
   };
 
   // ── Crea link di firma per un progetto ───────────────────────────────────
-  const creaLinkFirma = useCallback(async (proyectoId, proyectoInfo, giorniValidita = 7) => {
+  const creaLinkFirma = useCallback(async (proyectoId, proyectoInfo, giorniValidita = 7, proyectoSnapshot = null) => {
     const b = base();
     if (!b) { onToast("❌ Workspace non trovato"); return null; }
     try {
@@ -41,17 +41,28 @@ export function useFirma({ workspaceId, onToast }) {
         token,
         workspaceId,
         proyectoId,
-        cliente:    proyectoInfo?.cliente    || "",
-        descripcion:proyectoInfo?.descripcion|| "",
-        stato:      FIRMA_STATI.PENDING,
-        creadoAt:   new Date().toISOString(),
-        scadenzaAt: scadenza.toISOString(),
-        creadoBy:   uid() || "",
+        cliente:     proyectoInfo?.cliente     || "",
+        descripcion: proyectoInfo?.descripcion || "",
+        stato:       FIRMA_STATI.PENDING,
+        creadoAt:    new Date().toISOString(),
+        scadenzaAt:  scadenza.toISOString(),
+        creadoBy:    uid() || "",
         firmaNome:       null,
         firmaImmagine:   null,
         firmaData:       null,
         firmaIP:         null,
         rifiutoMotivo:   null,
+        // ── Snapshot progetto: permette lettura pubblica senza auth ──────
+        // Il cliente legge solo firme/{token} (allow read: if true)
+        // senza accedere a proyectos/ che richiede isMember
+        proyectoSnapshot: proyectoSnapshot ? {
+          info:     proyectoSnapshot.info     || {},
+          partidas: (proyectoSnapshot.partidas || []).filter(p => p.visible !== false),
+          pct:      proyectoSnapshot.pct      || {},
+          iva:      proyectoSnapshot.iva      || false,
+          condPago: proyectoSnapshot.condPago || "",
+          condPagoPersonalizado: proyectoSnapshot.condPagoPersonalizado || "",
+        } : null,
       });
 
       // URL della pagina pubblica di firma

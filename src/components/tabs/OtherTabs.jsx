@@ -93,7 +93,7 @@ export function TabResumen({ partidas, pct, cats, iva, t }) {
 
 // ─── TabVistaCliente ──────────────────────────────────────────────────────────
 
-export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, setCatVisKey, iva, estado, currentId, validez, t, onInviaFirma, firme = [], fotos = [], plan = "free" }) {
+export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, setCatVisKey, iva, estado, currentId, validez, t, onInviaFirma, firme = [], fotos = [], plan = "free", onTrackPdf }) {
   const pdf = usePDFSettings();
   const isPro = plan === "pro" || plan === "team" || plan === "enterprise";
   const logoEffettivo = isPro && pdf.logoUrl ? pdf.logoUrl : LOGO_URL;
@@ -112,7 +112,7 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
         <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
 
           {/* PDF */}
-          <button onClick={() => window.print()}
+          <button onClick={() => { window.print(); onTrackPdf?.("download"); }}
             style={{ flex:1,minWidth:140,padding:"11px 14px",background:"#2b6cb0",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
             🖨️ Descargar PDF
           </button>
@@ -126,7 +126,7 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
             const waUrl = `https://wa.me/${norm}?text=${encodeURIComponent(msgWA)}`;
             return (
               <button
-                onClick={() => { window.print(); setTimeout(() => window.open(waUrl,"_blank","noopener,noreferrer"), 800); }}
+                onClick={() => { window.print(); onTrackPdf?.("whatsapp"); setTimeout(() => window.open(waUrl,"_blank","noopener,noreferrer"), 800); }}
                 style={{ flex:1,minWidth:140,padding:"11px 14px",background:"#25D366",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
                 💬 WA + PDF
               </button>
