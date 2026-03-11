@@ -148,15 +148,20 @@ export default function App() {
     return match ? match[1] : null;
   }, []);
 
-  // Landing page: / oppure /landing (tutto tranne /app e /firma/*)
-  const isLanding = useMemo(() => {
-    const path = window.location.pathname;
-    return path === "/" || path === "/landing";
+  // Landing page: useState per reagire a navigazione programmatica
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const onPop = () => setCurrentPath(window.location.pathname);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
+
+  const isLanding = currentPath === "/" || currentPath === "/landing";
 
   const goToApp = () => {
     window.history.pushState({}, "", "/app");
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    setCurrentPath("/app");
   };
 
   const saveTimer = useRef(null);
