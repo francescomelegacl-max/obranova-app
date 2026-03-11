@@ -104,7 +104,7 @@ export default function App() {
     changeMemberRole, removeMember, updateWorkspaceName, can,
   } = useWorkspace({ onToast: showToast });
 
-  const { canPlan, plan, isPro, isTrialActive, trialDaysLeft } = usePlan({ workspace });
+  const { canPlan, canUse, canCreateProyecto, plan, isPro, isTrialActive, trialDaysLeft, proyectosRestantes } = usePlan({ workspace }, proyectos);
   const [paywallFeature, setPaywallFeature] = useState(null);
   const openPaywall  = useCallback((feature) => setPaywallFeature(feature), []);
   const closePaywall = useCallback(() => setPaywallFeature(null), []);
@@ -191,7 +191,7 @@ export default function App() {
     return () => clearTimeout(saveTimer.current);
   }, [proy]); // eslint-disable-line
 
-  const handleNewProject     = async () => { const id = await newProyecto(); if (id) { dispatch({ type:"NEW_PROJECT", payload:id }); setTab(2); } };
+  const handleNewProject     = async () => { if (!canCreateProyecto()) { openPaywall("maxProyectos"); return; } const id = await newProyecto(); if (id) { dispatch({ type:"NEW_PROJECT", payload:id }); setTab(2); } };
   const handleSaveManual     = () => saveProyecto(proy.currentId, proy, true);
   const handleOpenProject    = (p) => { loadProject(p); setTab(2); };
   const handleOpenPDF        = (p) => { loadProject(p); setTab(7); };
@@ -441,7 +441,8 @@ export default function App() {
               🔍 <span style={{ opacity:.7,fontSize:10 }}>Ctrl+K</span>
             </button>
             {can("create_project") && (
-              <button onClick={handleNewProject} style={{ padding:"6px 11px",background:"#276749",color:"white",border:"none",borderRadius:7,cursor:"pointer",fontWeight:600,fontSize:12 }}>{t.nuevo}</button>
+              <button onClick={handleNewProject} style={{ padding:"6px 11px",background: canCreateProyecto() ? "#276749" : "#718096",color:"white",border:"none",borderRadius:7,cursor:"pointer",fontWeight:600,fontSize:12 }}>{t.nuevo}</button>
+              {!isPro && <span style={{ fontSize:10,color:"#fbd38d",fontWeight:700 }}>{proyectosRestantes}/3</span>}
             )}
             <button onClick={handleSaveManual} style={{ padding:"6px 11px",background:"#2b6cb0",color:"white",border:"none",borderRadius:7,cursor:"pointer",fontWeight:600,fontSize:12 }}>{t.guardar}</button>
             <button onClick={() => setShowFotos(true)} style={{ padding:"6px 11px",background:"#744210",color:"white",border:"none",borderRadius:7,cursor:"pointer",fontWeight:600,fontSize:12,display:"flex",alignItems:"center",gap:4 }}>
@@ -593,18 +594,18 @@ export default function App() {
         <Suspense fallback={<TabLoader />}>
           <ErrorBoundary label={TABS_DEF[tab]?.label}>
             {tab===0  && <TabDashboard proyectos={proyectos} partidas={proy.partidas} cats={cats} t={t} onOpenProject={handleOpenProject} onNewProject={handleNewProject} itemsInAlert={itemsInAlert} currentId={proy.currentId} />}
-            {tab===1  && <TabProyectos proyectos={proyectos} currentId={proy.currentId} onLoad={handleOpenProject} onDelete={handleDeleteProject} onPDF={handleOpenPDF} t={t} canPlan={canPlan} onPaywall={openPaywall} />}
+            {tab===1  && <TabProyectos proyectos={proyectos} currentId={proy.currentId} onLoad={handleOpenProject} onDelete={handleDeleteProject} onPDF={handleOpenPDF} t={t} canPlan={canPlan} canCreateProyecto={canCreateProyecto()} proyectosRestantes={proyectosRestantes} onPaywall={openPaywall} />}
             {tab===2  && <TabProyecto info={proy.info} setInfo={setInfo} pct={proy.pct} setPct={setPct} estado={proy.estado} setEstado={handleSetEstado} iva={proy.iva} setIva={setIva} validez={proy.validez} setValidez={setValidez} condPago={proy.condPago} setCondPago={setCondPago} condPagoPersonalizado={proy.condPagoPersonalizado} setCondPagoPersonalizado={setCondPagoPersonalizado} cuotas={proy.cuotas} setCuotas={setCuotas} partidas={proy.partidas} t={t} />}
-            {tab===3  && <TabCostos partidas={proy.partidas} cats={cats} addPartida={addPartida} updP={updP} delP={delP} dupP={dupP} addFromListino={handleAddFromListino} listino={listino} t={t} workspaceId={workspace?.id} lang={lang} info={proy.info} pct={proy.pct} condPago={proy.condPago} condPagoPersonalizado={proy.condPagoPersonalizado} cuotas={proy.cuotas} iva={proy.iva} onApplyTemplate={(tpl) => { tpl.partidas?.forEach(p => addFromListino({ ...p, id: undefined })); if (tpl.pct) dispatch({ type:"SET_PCT", payload:tpl.pct }); }} canPlan={canPlan} onPaywall={openPaywall} />}
+            {tab===3  && <TabCostos partidas={proy.partidas} cats={cats} addPartida={addPartida} updP={updP} delP={delP} dupP={dupP} addFromListino={handleAddFromListino} listino={listino} t={t} workspaceId={workspace?.id} lang={lang} info={proy.info} pct={proy.pct} condPago={proy.condPago} condPagoPersonalizado={proy.condPagoPersonalizado} cuotas={proy.cuotas} iva={proy.iva} onApplyTemplate={(tpl) => { tpl.partidas?.forEach(p => addFromListino({ ...p, id: undefined })); if (tpl.pct) dispatch({ type:"SET_PCT", payload:tpl.pct }); }} canPlan={canPlan} canExcel={canUse("exportExcel")} canTemplates={canUse("templates")} onPaywall={openPaywall} />}
             {tab===4  && <TabCalcolatore listino={listino} addPartida={addFromListino} cats={cats} onToast={showToast} />}
             {tab===5  && <TabKitMateriali kits={kits} cargando={cargandoKits} onSaveKit={saveKit} onDeleteKit={deleteKit} onImportarPredefinito={importarKitPredefinito} addPartida={addFromListino} cats={cats} onToast={showToast} />}
             {tab===6  && <TabResumen partidas={proy.partidas} pct={proy.pct} cats={cats} iva={proy.iva} t={t} />}
             {tab===7  && <TabVistaCliente info={proy.info} partidas={proy.partidas} pct={proy.pct} cats={cats} catVis={proy.catVis} getCatVis={getCatVis} setCatVisKey={setCatVisKey} iva={proy.iva} estado={proy.estado} currentId={proy.currentId} validez={proy.validez} t={t} onInviaFirma={handleInviaFirma} firme={firme} plan={workspace?.plan} />}
             {tab===8  && <TabListino listino={listino} cats={cats} catColors={CAT_COLORS} newCatName={newCatName} setNewCatName={setNewCatName} onAddCat={() => { addCat(newCatName,t); setNewCatName(""); }} onDeleteItem={deleteListinoItem} onAddFromListino={handleAddFromListino} onOpenAddModal={() => setShowAddListino(true)} DEFAULT_CATS={DEFAULT_CATS} t={t} onUpdatePrecio={async (id, field, value) => { await updatePrezzoManuale(id, { [field]: value }); await loadListino(); }} />}
             {tab===9  && <TabMagazzino items={magItems} movimenti={movimenti} itemsInAlert={itemsInAlert} loading={magLoading} cats={cats} proyectos={proyectos} onSaveItem={saveMagItem} onDeleteItem={deleteMagItem} onMovimento={registraMovimento} />}
-            {tab===10 && <TabFatture proyectos={proyectos} fatture={fatture} onCreaFattura={creaFattura} onTogglePagata={togglePagata} onEliminaFattura={eliminaFattura} />}
+            {tab===10 && (!canUse("fatture") ? <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:300}}><button onClick={()=>openPaywall("fatture")} style={{padding:"16px 32px",background:"linear-gradient(135deg,#2b6cb0,#553c9a)",color:"white",border:"none",borderRadius:12,cursor:"pointer",fontWeight:800,fontSize:15}}>⚡ Activar Facturas Pro</button></div> : <TabFatture proyectos={proyectos} fatture={fatture} onCreaFattura={creaFattura} onTogglePagata={togglePagata} onEliminaFattura={eliminaFattura} />)}
             {tab===11 && <TabStorico proyectos={proyectos} t={t} canPlan={canPlan} onPaywall={openPaywall} />}
-            {tab===12 && <TabAgenda proyectos={proyectos} fatture={fatture} onOpenProject={handleOpenProject} />}
+            {tab===12 && (!canUse("agenda") ? <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:300}}><button onClick={()=>openPaywall("agenda")} style={{padding:"16px 32px",background:"linear-gradient(135deg,#2b6cb0,#553c9a)",color:"white",border:"none",borderRadius:12,cursor:"pointer",fontWeight:800,fontSize:15}}>⚡ Activar Agenda Pro</button></div> : <TabAgenda proyectos={proyectos} fatture={fatture} onOpenProject={handleOpenProject} />)}
             {tab===13 && <TabSII proyectos={proyectos} workspaceId={workspace?.id} t={t} onToast={showToast} />}
             {tab===14 && <TabSettings workspace={workspace} members={members} myRole={myRole} can={can} onInvite={(email,role) => inviteMember(email,role,workspace.id)} onChangeRole={changeMemberRole} onRemoveMember={removeMember} onUpdateName={updateWorkspaceName} onGoToPiani={() => setTab(15)} />}
             {tab===15 && <TabPiani workspace={workspace} />}
