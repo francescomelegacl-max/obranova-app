@@ -105,7 +105,6 @@ export default function App() {
     changeMemberRole, removeMember, updateWorkspaceName, can,
   } = useWorkspace({ onToast: showToast });
 
-  const { canPlan, canUse, canCreateProyecto, plan, isPro, isTrialActive, trialDaysLeft, proyectosRestantes } = usePlan({ workspace }, proyectos);
   const [paywallFeature, setPaywallFeature] = useState(null);
   const openPaywall  = useCallback((feature) => setPaywallFeature(feature), []);
   const closePaywall = useCallback(() => setPaywallFeature(null), []);
@@ -116,6 +115,8 @@ export default function App() {
     loadListino, saveListinoItem, deleteListinoItem, loadCats, addCat,
     updateGiacenza, updatePrezzoManuale,
   } = useFirestore({ onToast: showToast, workspaceId: workspace?.id });
+
+  const { canPlan, canUse, canCreateProyecto, plan, isPro, isTrialActive, trialDaysLeft, proyectosRestantes } = usePlan({ workspace }, proyectos);
 
   const {
     items: magItems, movimenti, itemsInAlert, loading: magLoading,
