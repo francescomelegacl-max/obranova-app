@@ -1,9 +1,4 @@
 // ─── lib/firebase.js ─────────────────────────────────────────────────────────
-// 🔐 SICUREZZA: Le credenziali Firebase NON devono mai stare nel codice sorgente.
-// Crea un file .env nella root del progetto con queste variabili (vedi .env.example)
-// Il file .env è già in .gitignore di default nei progetti Vite.
-// NON committare mai le credenziali reali in Git.
-
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
@@ -23,10 +18,12 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db   = getFirestore(app);
 
-// Analytics — inizializzato solo se supportato dal browser (no SSR, no bot)
-export let analytics = null;
-isSupported().then((supported) => {
-  if (supported) {
-    analytics = getAnalytics(app);
-  }
-});
+// Analytics — lazy, evita circular dependency nel bundle
+let _analytics = null;
+isSupported().then((ok) => {
+  if (ok) _analytics = getAnalytics(app);
+}).catch(() => {});
+
+export function getAnalyticsInstance() {
+  return _analytics;
+}
