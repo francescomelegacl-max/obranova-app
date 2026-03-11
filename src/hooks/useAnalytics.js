@@ -1,54 +1,90 @@
 // ─── hooks/useAnalytics.js ────────────────────────────────────────────────────
+import { logEvent, setUserProperties } from "firebase/analytics";
 import { useCallback } from "react";
-import { logEvent } from "firebase/analytics";
 import { getAnalyticsInstance } from "../lib/firebase";
 
-export function useAnalytics() {
-  const track = useCallback((eventName, params = {}) => {
+// Helper — chiama analytics solo se disponibile
+function safeLog(eventName, params = {}) {
+  try {
     const analytics = getAnalyticsInstance();
     if (!analytics) return;
+    logEvent(analytics, eventName, params);
+  } catch (e) {
+    // Analytics bloccato da adblocker — silent fail
+  }
+}
+
+export function useAnalytics() {
+
+  // ── Utente ────────────────────────────────────────────────────────────────
+  const trackUserPlan = useCallback((plan, isTrialActive) => {
     try {
-      logEvent(analytics, eventName, params);
-    } catch (e) {
-      console.warn("[Analytics] logEvent error:", e);
-    }
+      const analytics = getAnalyticsInstance();
+      if (!analytics) return;
+      setUserProperties(analytics, {
+        plan,
+        trial_active: isTrialActive ? "yes" : "no",
+      });
+    } catch (e) {}
   }, []);
 
-  const trackProyectoCreated = useCallback((plan, proyectoCount) => {
-    track("proyecto_created", { plan, proyecto_count: proyectoCount });
-  }, [track]);
+  // ── Progetti ──────────────────────────────────────────────────────────────
+  const trackProjectCreated = useCallback((plan, totalProyectos) => {
+    safeLog("proyecto_created", { plan, total_proyectos: totalProyectos });
+  }, []);
 
-  const trackPdfGenerated = useCallback((plan, proyectoId) => {
-    track("pdf_generated", { plan, proyecto_id: proyectoId ?? "unknown" });
-  }, [track]);
+  const trackPaywallHit = useCallback((reason) => {
+    safeLog("paywall_hit", { reason });
+  }, []);
+
+  // ── PDF ───────────────────────────────────────────────────────────────────
+  const trackPdfGenerated = useCallback((plan, pdfCountThisMonth) => {
+    safeLog("pdf_generated", { plan, pdf_count_month: pdfCountThisMonth });
+  }, []);
 
   const trackPdfSharedWhatsapp = useCallback((plan) => {
-    track("pdf_shared_whatsapp", { plan });
-  }, [track]);
+    safeLog("pdf_shared_whatsapp", { plan });
+  }, []);
 
+  // ── Firma digitale ────────────────────────────────────────────────────────
   const trackFirmaRequested = useCallback((plan) => {
-    track("firma_requested", { plan });
-  }, [track]);
+    safeLog("firma_requested", { plan });
+  }, []);
 
-  const trackPaywallShown = useCallback((feature, plan) => {
-    track("paywall_shown", { feature, plan });
-  }, [track]);
+  const trackFirmaCompleted = useCallback(() => {
+    safeLog("firma_completed", {});
+  }, []);
 
-  const trackPlanUpgradeClick = useCallback((targetPlan, currentPlan) => {
-    track("plan_upgrade_click", { target_plan: targetPlan, current_plan: currentPlan });
-  }, [track]);
+  // ── Piani / Upgrade ───────────────────────────────────────────────────────
+  const trackUpgradeClicked = useCallback((source) => {
+    safeLog("upgrade_clicked", { source });
+  }, []);
 
-  const trackTrialStarted = useCallback((workspaceId) => {
-    track("trial_started", { workspace_id: workspaceId });
-  }, [track]);
+  const trackCheckoutStarted = useCallback((planName) => {
+    safeLog("checkout_started", { plan_name: planName });
+  }, []);
+
+  // ── Onboarding ────────────────────────────────────────────────────────────
+  const trackOnboardingCompleted = useCallback(() => {
+    safeLog("onboarding_completed", {});
+  }, []);
+
+  // ── Tab usage ─────────────────────────────────────────────────────────────
+  const trackLockedTabOpened = useCallback((tabName) => {
+    safeLog("locked_tab_opened", { tab_name: tabName });
+  }, []);
 
   return {
-    trackProyectoCreated,
+    trackUserPlan,
+    trackProjectCreated,
+    trackPaywallHit,
     trackPdfGenerated,
     trackPdfSharedWhatsapp,
     trackFirmaRequested,
-    trackPaywallShown,
-    trackPlanUpgradeClick,
-    trackTrialStarted,
+    trackFirmaCompleted,
+    trackUpgradeClicked,
+    trackCheckoutStarted,
+    trackOnboardingCompleted,
+    trackLockedTabOpened,
   };
 }
