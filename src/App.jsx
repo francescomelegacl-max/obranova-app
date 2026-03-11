@@ -59,6 +59,7 @@ const TabKitMateriali= lazy(() => import("./components/tabs/TabKitMateriali"));
 const TabAgenda     = lazy(() => import("./components/tabs/TabAgenda"));
 const PaginaFirma   = lazy(() => import("./components/FirmaPage"));
 const AdminDashboard= lazy(() => import("./components/tabs/AdminDashboard"));
+const LandingPage    = lazy(() => import("./components/LandingPage"));
 
 // ── OtherTabs — lazy con named export wrapper (fix: no await top-level) ───────
 const TabResumen     = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabResumen })));
@@ -141,11 +142,22 @@ export default function App() {
     loadKits, saveKit, deleteKit, importarKitPredefinito,
   } = useKits({ onToast: showToast, workspaceId: workspace?.id });
 
-  // ── Routing firma pubblica ────────────────────────────────────────────────
+  // ── Routing pubblico ─────────────────────────────────────────────────────
   const firmaToken = useMemo(() => {
     const match = window.location.pathname.match(/^\/firma\/([a-f0-9]+)$/);
     return match ? match[1] : null;
   }, []);
+
+  // Landing page: / oppure /landing (tutto tranne /app e /firma/*)
+  const isLanding = useMemo(() => {
+    const path = window.location.pathname;
+    return path === "/" || path === "/landing";
+  }, []);
+
+  const goToApp = () => {
+    window.history.pushState({}, "", "/app");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  };
 
   const saveTimer = useRef(null);
 
@@ -223,9 +235,17 @@ export default function App() {
   }, [setEstado, proy.info, totals, workspace]);
   const handleInviaFirma = async () => {
     if (!proy.currentId) { showToast("❌ " + t.errorNoProyecto); return; }
-    // FIX 1.5: creaLinkFirma salva già il token in workspaces/{id}/firme/{token}
-    // Non serve più scrivere in tokens_firma/ — loadFirmaPubblica usa collectionGroup
-    const result = await creaLinkFirma(proy.currentId, proy.info);
+    // Passa snapshot completo del progetto — il cliente leggerà solo firme/{token}
+    // senza bisogno di autenticarsi (fix: proyectos/ richiede isMember)
+    const snapshot = {
+      info:     proy.info,
+      partidas: proy.partidas,
+      pct:      proy.pct,
+      iva:      proy.iva,
+      condPago: proy.condPago,
+      condPagoPersonalizado: proy.condPagoPersonalizado,
+    };
+    const result = await creaLinkFirma(proy.currentId, proy.info, 7, snapshot);
     if (result) copiaLink(result.url);
   };
 
@@ -290,6 +310,13 @@ export default function App() {
     if (dx < 0 && currIdx < swipeableTabs.length - 1) setTab(swipeableTabs[currIdx + 1]);
     if (dx > 0 && currIdx > 0) setTab(swipeableTabs[currIdx - 1]);
   }, [isMobile, tab]);
+
+  // ── Landing page pubblica ────────────────────────────────────────────────
+  if (isLanding) return (
+    <Suspense fallback={<div style={{ minHeight:"100vh",background:"#0f1b2d" }} />}>
+      <LandingPage onGoToApp={goToApp} />
+    </Suspense>
+  );
 
   // ── Pagina pubblica firma ─────────────────────────────────────────────────
   if (firmaToken) return (
@@ -441,8 +468,10 @@ export default function App() {
               🔍 <span style={{ opacity:.7,fontSize:10 }}>Ctrl+K</span>
             </button>
             {can("create_project") && (
-              <button onClick={handleNewProject} style={{ padding:"6px 11px",background: canCreateProyecto() ? "#276749" : "#718096",color:"white",border:"none",borderRadius:7,cursor:"pointer",fontWeight:600,fontSize:12 }}>{t.nuevo}</button>
-              {!isPro && <span style={{ fontSize:10,color:"#fbd38d",fontWeight:700 }}>{proyectosRestantes}/3</span>}
+              <>
+                <button onClick={handleNewProject} style={{ padding:"6px 11px",background: canCreateProyecto() ? "#276749" : "#718096",color:"white",border:"none",borderRadius:7,cursor:"pointer",fontWeight:600,fontSize:12 }}>{t.nuevo}</button>
+                {!isPro && <span style={{ fontSize:10,color:"#fbd38d",fontWeight:700 }}>{proyectosRestantes}/3</span>}
+              </>
             )}
             <button onClick={handleSaveManual} style={{ padding:"6px 11px",background:"#2b6cb0",color:"white",border:"none",borderRadius:7,cursor:"pointer",fontWeight:600,fontSize:12 }}>{t.guardar}</button>
             <button onClick={() => setShowFotos(true)} style={{ padding:"6px 11px",background:"#744210",color:"white",border:"none",borderRadius:7,cursor:"pointer",fontWeight:600,fontSize:12,display:"flex",alignItems:"center",gap:4 }}>

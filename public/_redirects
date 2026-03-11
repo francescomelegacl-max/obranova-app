@@ -1,1 +1,6 @@
-/*    /index.html   200
+# ── Obra Nova SPA — Netlify Redirects ────────────────────────────────────────
+# Tutte le routes vengono gestite da React (SPA)
+# La landing page è su / — l'app è su /app
+# Le firme pubbliche su /firma/:token
+
+/*    /index.html    200
