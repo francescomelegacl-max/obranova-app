@@ -1,6 +1,6 @@
 // ─── App.jsx ─────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
-import { onAuthStateChanged, signOut }      from "firebase/auth";
+import { onAuthStateChanged, signOut, signInWithEmailAndPassword } from "firebase/auth";
 import { auth }                             from "./lib/firebase";
 import { useProyecto }                      from "./hooks/useProyecto";
 import { useFirestore }                     from "./hooks/useFirestore";
@@ -16,9 +16,10 @@ import PaywallModal                         from "./components/PaywallModal";
 import T                                    from "./i18n/translations";
 import { calcTotals, exportCSV }            from "./utils/helpers";
 import {
-  LOGO_URL, ESTADOS, ESTADO_COLORS, ESTADO_BG,
+  ESTADOS, ESTADO_COLORS, ESTADO_BG,
   PRINT_STYLE, CAT_COLORS, DEFAULT_CATS
 }                                           from "./utils/constants";
+import { LOGO_URL }                              from "./utils/logo";
 import { Toast, LoginScreen, ModalListino } from "./components/UI";
 import WorkspaceScreen                      from "./components/WorkspaceScreen";
 import ModalFotos                           from "./components/ModalFotos";
@@ -106,10 +107,6 @@ export default function App() {
     changeMemberRole, removeMember, updateWorkspaceName, can,
   } = useWorkspace({ onToast: showToast });
 
-  const [paywallFeature, setPaywallFeature] = useState(null);
-  const openPaywall  = useCallback((feature) => { setPaywallFeature(feature); trackPaywallShown(feature); }, [trackPaywallShown]);
-  const closePaywall = useCallback(() => setPaywallFeature(null), []);
-
   const {
     proyectos, listino, fotosMap, cats, guardando,
     loadProyectos, saveProyecto, newProyecto, deleteProyecto,
@@ -117,9 +114,17 @@ export default function App() {
     updateGiacenza, updatePrezzoManuale,
   } = useFirestore({ onToast: showToast, workspaceId: workspace?.id });
 
-  const { canPlan, canUse, canCreateProyecto, plan, isPro, isTrialActive, trialDaysLeft, proyectosRestantes } = usePlan({ workspace }, proyectos);
+  const {
+    canPlan, canUse, canAdd, remaining, filterByHistorial,
+    canCreateProyecto, plan, isPro, limits,
+    isTrialActive, trialDaysLeft, proyectosRestantes,
+  } = usePlan({ workspace }, proyectos);
 
   const { trackProyectoCreado, trackPdfGenerado, trackFirmaSolicitada, trackPaywallShown, trackUpgradeClick, trackTrialStarted } = useAnalytics({ workspace, plan, isTrialActive });
+
+  const [paywallFeature, setPaywallFeature] = useState(null);
+  const openPaywall  = useCallback((feature) => { setPaywallFeature(feature); trackPaywallShown(feature); }, [trackPaywallShown]);
+  const closePaywall = useCallback(() => setPaywallFeature(null), []);
 
   // Traccia trial_started una volta sola per workspace (usa sessionStorage come flag)
   useEffect(() => {
@@ -228,7 +233,22 @@ export default function App() {
   const handleOpenProject    = (p) => { loadProject(p); setTab(2); };
   const handleOpenPDF        = (p) => { loadProject(p); setTab(7); };
   const handleDeleteProject  = async (id) => { const d = await deleteProyecto(id); if (d && id===proy.currentId) dispatch({ type:"NEW_PROJECT", payload:null }); };
-  const handleAddFromListino = (item) => { addFromListino(item); setTab(3); };
+  const handleAddFromListino = (item) => {
+    if (!canAdd("partidas", proy.partidas.length)) { openPaywall("maxPartidas"); return; }
+    addFromListino(item); setTab(3);
+  };
+  const handleAddPartida = () => {
+    if (!canAdd("partidas", proy.partidas.length)) { openPaywall("maxPartidas"); return; }
+    addPartida();
+  };
+  const handleSaveListinoItem = async (item) => {
+    if (!canAdd("listino", listino.length)) { openPaywall("maxListino"); return; }
+    await saveListinoItem(item);
+  };
+  const handleSaveMagItem = async (form, existingId = null) => {
+    if (!existingId && !canAdd("bodega", magItems.length)) { openPaywall("maxBodega"); return; }
+    await saveMagItem(form, existingId);
+  };
 
   const totals = useMemo(() => calcTotals(proy.partidas, proy.pct), [proy.partidas, proy.pct]);
 
@@ -350,7 +370,7 @@ export default function App() {
       Cargando...
     </div>
   );
-  if (!user) return <LoginScreen onLogin={u => setUser(u)} />;
+  if (!user) return <LoginScreen onLogin={u => setUser(u)} auth={auth} signIn={signInWithEmailAndPassword} />;
   if (loadingWS) return (
     <div style={{ minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#1a365d",color:"white",fontSize:18 }}>
       Cargando...
@@ -390,7 +410,7 @@ export default function App() {
       )}
       {showOnboarding  && <ModalOnboarding t={t} onClose={() => setShowOnboarding(false)} />}
       {showRicerca     && <RicercaGlobale proyectos={proyectos} t={t} onOpenProject={(p) => { handleOpenProject(p); }} onClose={() => setShowRicerca(false)} />}
-      {showAddListino  && <ModalListino onSave={saveListinoItem} onClose={() => setShowAddListino(false)} t={t} cats={cats} />}
+      {showAddListino  && <ModalListino onSave={handleSaveListinoItem} onClose={() => setShowAddListino(false)} t={t} cats={cats} />}
       {showFotos       && <ModalFotos fotos={proy.fotos} setFotos={setFotos} fotosMap={fotosMap} t={t} onClose={() => setShowFotos(false)} />}
 
       {showEmailNotif && (
@@ -645,13 +665,13 @@ export default function App() {
             {tab===0  && <TabDashboard proyectos={proyectos} partidas={proy.partidas} cats={cats} t={t} onOpenProject={handleOpenProject} onNewProject={handleNewProject} itemsInAlert={itemsInAlert} currentId={proy.currentId} />}
             {tab===1  && <TabProyectos proyectos={proyectos} currentId={proy.currentId} onLoad={handleOpenProject} onDelete={handleDeleteProject} onPDF={handleOpenPDF} t={t} canPlan={canPlan} canCreateProyecto={canCreateProyecto()} proyectosRestantes={proyectosRestantes} onPaywall={openPaywall} />}
             {tab===2  && <TabProyecto info={proy.info} setInfo={setInfo} pct={proy.pct} setPct={setPct} estado={proy.estado} setEstado={handleSetEstado} iva={proy.iva} setIva={setIva} validez={proy.validez} setValidez={setValidez} condPago={proy.condPago} setCondPago={setCondPago} condPagoPersonalizado={proy.condPagoPersonalizado} setCondPagoPersonalizado={setCondPagoPersonalizado} cuotas={proy.cuotas} setCuotas={setCuotas} partidas={proy.partidas} t={t} />}
-            {tab===3  && <TabCostos partidas={proy.partidas} cats={cats} addPartida={addPartida} updP={updP} delP={delP} dupP={dupP} addFromListino={handleAddFromListino} listino={listino} t={t} workspaceId={workspace?.id} lang={lang} info={proy.info} pct={proy.pct} condPago={proy.condPago} condPagoPersonalizado={proy.condPagoPersonalizado} cuotas={proy.cuotas} iva={proy.iva} onApplyTemplate={(tpl) => { tpl.partidas?.forEach(p => addFromListino({ ...p, id: undefined })); if (tpl.pct) dispatch({ type:"SET_PCT", payload:tpl.pct }); }} canPlan={canPlan} canExcel={canUse("exportExcel")} canTemplates={canUse("templates")} onPaywall={openPaywall} />}
-            {tab===4  && <TabCalcolatore listino={listino} addPartida={addFromListino} cats={cats} onToast={showToast} />}
-            {tab===5  && <TabKitMateriali kits={kits} cargando={cargandoKits} onSaveKit={saveKit} onDeleteKit={deleteKit} onImportarPredefinito={importarKitPredefinito} addPartida={addFromListino} cats={cats} onToast={showToast} />}
+            {tab===3  && <TabCostos partidas={proy.partidas} cats={cats} addPartida={handleAddPartida} updP={updP} delP={delP} dupP={dupP} addFromListino={handleAddFromListino} listino={listino} t={t} workspaceId={workspace?.id} lang={lang} info={proy.info} pct={proy.pct} condPago={proy.condPago} condPagoPersonalizado={proy.condPagoPersonalizado} cuotas={proy.cuotas} iva={proy.iva} onApplyTemplate={(tpl) => { tpl.partidas?.forEach(p => { if (canAdd("partidas", proy.partidas.length)) addFromListino({ ...p, id: undefined }); }); if (tpl.pct) dispatch({ type:"SET_PCT", payload:tpl.pct }); }} canPlan={canPlan} canExcel={canUse("exportExcel")} canTemplates={canUse("templates")} onPaywall={openPaywall} partidasRestantes={remaining("partidas", proy.partidas.length)} isPro={isPro} />}
+            {tab===4  && <TabCalcolatore listino={listino} addPartida={handleAddFromListino} cats={cats} onToast={showToast} canAdd={(n) => canAdd("calcoli", n)} calcRestanti={remaining("calcoli", 0)} onPaywall={openPaywall} />}
+            {tab===5  && <TabKitMateriali kits={kits} cargando={cargandoKits} onSaveKit={saveKit} onDeleteKit={deleteKit} onImportarPredefinito={importarKitPredefinito} addPartida={handleAddFromListino} cats={cats} onToast={showToast} canAddKit={() => canAdd("kits", kits.length)} kitsRestanti={remaining("kits", kits.length)} onPaywall={openPaywall} />}
             {tab===6  && <TabResumen partidas={proy.partidas} pct={proy.pct} cats={cats} iva={proy.iva} t={t} />}
             {tab===7  && <TabVistaCliente info={proy.info} partidas={proy.partidas} pct={proy.pct} cats={cats} catVis={proy.catVis} getCatVis={getCatVis} setCatVisKey={setCatVisKey} iva={proy.iva} estado={proy.estado} currentId={proy.currentId} validez={proy.validez} t={t} onInviaFirma={handleInviaFirma} firme={firme} plan={workspace?.plan} onTrackPdf={trackPdfGenerado} />}
-            {tab===8  && <TabListino listino={listino} cats={cats} catColors={CAT_COLORS} newCatName={newCatName} setNewCatName={setNewCatName} onAddCat={() => { addCat(newCatName,t); setNewCatName(""); }} onDeleteItem={deleteListinoItem} onAddFromListino={handleAddFromListino} onOpenAddModal={() => setShowAddListino(true)} DEFAULT_CATS={DEFAULT_CATS} t={t} onUpdatePrecio={async (id, field, value) => { await updatePrezzoManuale(id, { [field]: value }); await loadListino(); }} />}
-            {tab===9  && <TabMagazzino items={magItems} movimenti={movimenti} itemsInAlert={itemsInAlert} loading={magLoading} cats={cats} proyectos={proyectos} onSaveItem={saveMagItem} onDeleteItem={deleteMagItem} onMovimento={registraMovimento} />}
+            {tab===8  && <TabListino listino={listino} cats={cats} catColors={CAT_COLORS} newCatName={newCatName} setNewCatName={setNewCatName} onAddCat={() => { addCat(newCatName,t); setNewCatName(""); }} onDeleteItem={deleteListinoItem} onAddFromListino={handleAddFromListino} onOpenAddModal={() => setShowAddListino(true)} DEFAULT_CATS={DEFAULT_CATS} t={t} onUpdatePrecio={async (id, field, value) => { await updatePrezzoManuale(id, { [field]: value }); await loadListino(); }} listinoRestanti={remaining("listino", listino.length)} onPaywall={openPaywall} isPro={isPro} />}
+            {tab===9  && <TabMagazzino items={magItems} movimenti={movimenti} itemsInAlert={itemsInAlert} loading={magLoading} cats={cats} proyectos={proyectos} onSaveItem={handleSaveMagItem} onDeleteItem={deleteMagItem} onMovimento={registraMovimento} bodegaRestanti={remaining("bodega", magItems.length)} onPaywall={openPaywall} isPro={isPro} />}
             {tab===10 && (!canUse("fatture") ? <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:300}}><button onClick={()=>openPaywall("fatture")} style={{padding:"16px 32px",background:"linear-gradient(135deg,#2b6cb0,#553c9a)",color:"white",border:"none",borderRadius:12,cursor:"pointer",fontWeight:800,fontSize:15}}>⚡ Activar Facturas Pro</button></div> : <TabFatture proyectos={proyectos} fatture={fatture} onCreaFattura={creaFattura} onTogglePagata={togglePagata} onEliminaFattura={eliminaFattura} />)}
             {tab===11 && <TabStorico proyectos={proyectos} t={t} canPlan={canPlan} onPaywall={openPaywall} />}
             {tab===12 && (!canUse("agenda") ? <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:300}}><button onClick={()=>openPaywall("agenda")} style={{padding:"16px 32px",background:"linear-gradient(135deg,#2b6cb0,#553c9a)",color:"white",border:"none",borderRadius:12,cursor:"pointer",fontWeight:800,fontSize:15}}>⚡ Activar Agenda Pro</button></div> : <TabAgenda proyectos={proyectos} fatture={fatture} onOpenProject={handleOpenProject} />)}

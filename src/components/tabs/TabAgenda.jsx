@@ -214,7 +214,7 @@ function VistaMensile({ events, onEventClick, onDayClick }) {
               onMouseEnter={e => e.currentTarget.style.background = isToday ? "#dbeafe" : "#f7fafc"}
               onMouseLeave={e => e.currentTarget.style.background = isToday ? "#ebf8ff" : "white"}
             >
-              <div style={{ fontWeight: isToday ? 800 : 600, fontSize: 12, color: isToday ? "#2b6cb0" : "#2d3748", marginBottom: 4,
+              <div style={{ fontWeight: isToday ? 800 : 600, fontSize: 12, marginBottom: 4,
                 background: isToday ? "#2b6cb0" : "transparent", color: isToday ? "white" : "#2d3748",
                 borderRadius: isToday ? 99 : 0, width: isToday ? 22 : "auto", height: isToday ? 22 : "auto",
                 display: "flex", alignItems: "center", justifyContent: "center" }}>

@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "obra-nova-spa"
-  }
+  },
+  "targets": {
+    "obra-nova-spa": {
+      "hosting": {
+        "obra-nova-spa": [
+          "obra-nova-spa"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

@@ -8,19 +8,29 @@ service cloud.firestore {
     function isMember(wsId) {
       return isAuth() && exists(/databases/$(database)/documents/workspaces/$(wsId)/members/$(request.auth.uid));
     }
-    function isOwner(wsId) {
-      return isAuth() && get(/databases/$(database)/documents/workspaces/$(wsId)).data.ownerId == request.auth.uid;
-    }
 
     match /workspaces/{workspaceId} {
-      allow read:   if isMember(workspaceId);
+      // list (query): utente autenticato — la query filtra già per ownerId o membership
+      // get (documento singolo): solo owner o membri
+      allow list:   if isAuth();
+      allow get:    if isAuth() && (
+        resource.data.ownerId == request.auth.uid ||
+        isMember(workspaceId)
+      );
       allow create: if isAuth();
-      allow update: if isMember(workspaceId);
-      allow delete: if isOwner(workspaceId);
+      allow update: if isAuth() && (
+        resource.data.ownerId == request.auth.uid ||
+        isMember(workspaceId)
+      );
+      allow delete: if isAuth() && resource.data.ownerId == request.auth.uid;
 
       match /members/{memberId} {
-        allow read:   if isMember(workspaceId);
-        allow write:  if isOwner(workspaceId) || request.auth.uid == memberId;
+        allow read:  if isMember(workspaceId) || request.auth.uid == memberId;
+        allow write: if isAuth() && (
+          resource == null ||
+          request.auth.uid == memberId ||
+          get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerId == request.auth.uid
+        );
       }
       match /proyectos/{docId}   { allow read, write: if isMember(workspaceId); }
       match /magazzino/{docId}   { allow read, write: if isMember(workspaceId); }
@@ -29,6 +39,9 @@ service cloud.firestore {
       match /cats/{docId}        { allow read, write: if isMember(workspaceId); }
       match /fatture/{docId}     { allow read, write: if isMember(workspaceId); }
       match /prezzi_ml/{docId}   { allow read, write: if isMember(workspaceId); }
+      match /kits/{docId}        { allow read, write: if isMember(workspaceId); }
+      match /templates/{docId}   { allow read, write: if isMember(workspaceId); }
+      match /agenda/{docId}      { allow read, write: if isMember(workspaceId); }
       match /firme/{tokenId}     { allow read, write: if true; }
     }
 

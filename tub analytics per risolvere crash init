@@ -1,0 +1,109 @@
+[1mdiff --git a/src/hooks/useAnalytics.js b/src/hooks/useAnalytics.js[m
+[1mindex 44d2e08..fe687dd 100644[m
+[1m--- a/src/hooks/useAnalytics.js[m
+[1m+++ b/src/hooks/useAnalytics.js[m
+[36m@@ -1,90 +1,22 @@[m
+ // ─── hooks/useAnalytics.js ────────────────────────────────────────────────────[m
+[31m-import { logEvent, setUserProperties } from "firebase/analytics";[m
+[32m+[m[32m// STUB temporaneo — Analytics disabilitato per fix crash init.[m
+[32m+[m[32m// Da riattivare con Firebase Analytics dopo stabilizzazione app.[m
+ import { useCallback } from "react";[m
+[31m-import { getAnalyticsInstance } from "../lib/firebase";[m
+ [m
+[31m-// Helper — chiama analytics solo se disponibile[m
+[31m-function safeLog(eventName, params = {}) {[m
+[31m-  try {[m
+[31m-    const analytics = getAnalyticsInstance();[m
+[31m-    if (!analytics) return;[m
+[31m-    logEvent(analytics, eventName, params);[m
+[31m-  } catch (e) {[m
+[31m-    // Analytics bloccato da adblocker — silent fail[m
+[31m-  }[m
+[31m-}[m
+[32m+[m[32mconst noop = () => {};[m
+ [m
+ export function useAnalytics() {[m
+[31m-[m
+[31m-  // ── Utente ────────────────────────────────────────────────────────────────[m
+[31m-  const trackUserPlan = useCallback((plan, isTrialActive) => {[m
+[31m-    try {[m
+[31m-      const analytics = getAnalyticsInstance();[m
+[31m-      if (!analytics) return;[m
+[31m-      setUserProperties(analytics, {[m
+[31m-        plan,[m
+[31m-        trial_active: isTrialActive ? "yes" : "no",[m
+[31m-      });[m
+[31m-    } catch (e) {}[m
+[31m-  }, []);[m
+[31m-[m
+[31m-  // ── Progetti ──────────────────────────────────────────────────────────────[m
+[31m-  const trackProjectCreated = useCallback((plan, totalProyectos) => {[m
+[31m-    safeLog("proyecto_created", { plan, total_proyectos: totalProyectos });[m
+[31m-  }, []);[m
+[31m-[m
+[31m-  const trackPaywallHit = useCallback((reason) => {[m
+[31m-    safeLog("paywall_hit", { reason });[m
+[31m-  }, []);[m
+[31m-[m
+[31m-  // ── PDF ───────────────────────────────────────────────────────────────────[m
+[31m-  const trackPdfGenerated = useCallback((plan, pdfCountThisMonth) => {[m
+[31m-    safeLog("pdf_generated", { plan, pdf_count_month: pdfCountThisMonth });[m
+[31m-  }, []);[m
+[31m-[m
+[31m-  const trackPdfSharedWhatsapp = useCallback((plan) => {[m
+[31m-    safeLog("pdf_shared_whatsapp", { plan });[m
+[31m-  }, []);[m
+[31m-[m
+[31m-  // ── Firma digitale ────────────────────────────────────────────────────────[m
+[31m-  const trackFirmaRequested = useCallback((plan) => {[m
+[31m-    safeLog("firma_requested", { plan });[m
+[31m-  }, []);[m
+[31m-[m
+[31m-  const trackFirmaCompleted = useCallback(() => {[m
+[31m-    safeLog("firma_completed", {});[m
+[31m-  }, []);[m
+[31m-[m
+[31m-  // ── Piani / Upgrade ───────────────────────────────────────────────────────[m
+[31m-  const trackUpgradeClicked = useCallback((source) => {[m
+[31m-    safeLog("upgrade_clicked", { source });[m
+[31m-  }, []);[m
+[31m-[m
+[31m-  const trackCheckoutStarted = useCallback((planName) => {[m
+[31m-    safeLog("checkout_started", { plan_name: planName });[m
+[31m-  }, []);[m
+[31m-[m
+[31m-  // ── Onboarding ────────────────────────────────────────────────────────────[m
+[31m-  const trackOnboardingCompleted = useCallback(() => {[m
+[31m-    safeLog("onboarding_completed", {});[m
+[31m-  }, []);[m
+[31m-[m
+[31m-  // ── Tab usage ─────────────────────────────────────────────────────────────[m
+[31m-  const trackLockedTabOpened = useCallback((tabName) => {[m
+[31m-    safeLog("locked_tab_opened", { tab_name: tabName });[m
+[31m-  }, []);[m
+[31m-[m
+   return {[m
+[31m-    trackUserPlan,[m
+[31m-    trackProjectCreated,[m
+[31m-    trackPaywallHit,[m
+[31m-    trackPdfGenerated,[m
+[31m-    trackPdfSharedWhatsapp,[m
+[31m-    trackFirmaRequested,[m
+[31m-    trackFirmaCompleted,[m
+[31m-    trackUpgradeClicked,[m
+[31m-    trackCheckoutStarted,[m
+[31m-    trackOnboardingCompleted,[m
+[31m-    trackLockedTabOpened,[m
+[32m+[m[32m    trackUserPlan:            useCallback(noop, []),[m
+[32m+[m[32m    trackProjectCreated:      useCallback(noop, []),[m
+[32m+[m[32m    trackPaywallHit:          useCallback(noop, []),[m
+[32m+[m[32m    trackPdfGenerated:        useCallback(noop, []),[m
+[32m+[m[32m    trackPdfSharedWhatsapp:   useCallback(noop, []),[m
+[32m+[m[32m    trackFirmaRequested:      useCallback(noop, []),[m
+[32m+[m[32m    trackFirmaCompleted:      useCallback(noop, []),[m
+[32m+[m[32m    trackUpgradeClicked:      useCallback(noop, []),[m
+[32m+[m[32m    trackCheckoutStarted:     useCallback(noop, []),[m
+[32m+[m[32m    trackOnboardingCompleted: useCallback(noop, []),[m
+[32m+[m[32m    trackLockedTabOpened:     useCallback(noop, []),[m
+   };[m
+ }[m

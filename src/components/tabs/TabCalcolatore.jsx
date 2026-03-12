@@ -74,7 +74,7 @@ function RigaCalc({ riga, onUpdate, onDelete, catColor }) {
 }
 
 // ── Componente principale ─────────────────────────────────────────────────────
-export default function TabCalcolatore({ listino = [], standalone = false, addPartida, cats = [], onToast }) {
+export default function TabCalcolatore({ listino = [], standalone = false, addPartida, cats = [], onToast, canAdd = () => true, calcRestanti = Infinity, onPaywall = () => {} }) {
 
   const [righe,      setRighe]      = useState([]);
   const [nome,       setNome]       = useState("");
@@ -125,6 +125,7 @@ export default function TabCalcolatore({ listino = [], standalone = false, addPa
   // ── Salva calcolo ────────────────────────────────────────────────────────────
   const handleSave = () => {
     if (!nome.trim() && righe.length === 0) return;
+    if (!canAdd(calcSalvati.length)) { onPaywall("maxCalcoli"); return; }
     const calc = {
       id:     ID(),
       nome:   nome || "Cálculo " + new Date().toLocaleDateString("es-CL"),
@@ -387,6 +388,11 @@ export default function TabCalcolatore({ listino = [], standalone = false, addPa
                 style={{ padding:"11px",background:saved?"#276749":"#1a365d",color:"white",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13,transition:"all .2s" }}>
                 {saved ? "✅ Guardado" : "💾 Guardar cálculo"}
               </button>
+              {calcRestanti !== Infinity && (
+                <div style={{ fontSize:11, color: calcRestanti === 0 ? "#c53030" : "#718096", textAlign:"center" }}>
+                  {calcRestanti === 0 ? "⚠️ Límite alcanzado" : `${calcRestanti} guardados restantes (plan Free)`}
+                </div>
+              )}
 
               {/* ── Aggiungi a Costos ── */}
               {addPartida && (

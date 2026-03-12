@@ -1,6 +1,7 @@
 // ─── components/tabs/TabFatture.jsx ──────────────────────────────────────────
 import { useState, useMemo } from "react";
-import { EMPRESA, LOGO_URL, CAT_COLORS } from "../../utils/constants";
+import { EMPRESA, CAT_COLORS } from "../../utils/constants";
+import { LOGO_URL } from "../../utils/logo";
 
 const fmt = (n) => n == null ? "—" : Number(n).toLocaleString("es-CL", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 

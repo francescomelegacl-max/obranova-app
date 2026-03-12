@@ -5,7 +5,7 @@
 //   c) accettare/rifiutare inviti pendenti
 
 import { useState, useEffect } from "react";
-import { LOGO_URL } from "../utils/constants";
+import { LOGO_URL } from "../utils/logo";
 import { ROLE_LABELS, ROLE_COLORS } from "../hooks/useWorkspace";
 
 export default function WorkspaceScreen({

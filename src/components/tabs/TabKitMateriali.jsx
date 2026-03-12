@@ -38,6 +38,9 @@ export default function TabKitMateriali({
   addPartida,
   cats = [],
   onToast,
+  canAddKit = () => true,
+  kitsRestanti = Infinity,
+  onPaywall = () => {},
 }) {
   const [vista, setVista] = useState("galeria"); // "galeria" | "editor" | "detalle"
   const [filtrocat, setFiltroCat] = useState("Todos");
@@ -59,6 +62,8 @@ export default function TabKitMateriali({
   const [formKit, setFormKit] = useState(kitVacio);
 
   const abrirEditor = (kit = null) => {
+    // Check limit only for new kits, not edits
+    if (!kit && !canAddKit()) { onPaywall("maxKits"); return; }
     if (kit) {
       setFormKit({ ...kit, materiales: kit.materiales?.map(m => ({ ...m })) || [] });
       setEditando(kit.id || null);
@@ -378,7 +383,7 @@ export default function TabKitMateriali({
 
       {/* Pestañas */}
       <div style={{ display: "flex", background: "#f0f0f0", borderRadius: 10, padding: 3, marginBottom: 14, gap: 3 }}>
-        {[["predefinidos", "⚡ Predefinidos"], ["mios", `📁 Mis kits${kits.length ? ` (${kits.length})` : ""}`]].map(([val, label]) => (
+        {[["predefinidos", "⚡ Predefinidos"], ["mios", `📁 Mis kits${kits.length ? ` (${kits.length}${kitsRestanti !== Infinity ? `/${kits.length + kitsRestanti}` : ""})` : ""}`]].map(([val, label]) => (
           <button key={val} onClick={() => setPestana(val)}
             style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", cursor: "pointer",
               fontWeight: 600, fontSize: 13,

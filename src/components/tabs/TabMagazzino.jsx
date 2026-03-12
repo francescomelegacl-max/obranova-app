@@ -274,6 +274,9 @@ export default function TabMagazzino({
   items = [], movimenti = [], proyectos = [],
   onSaveItem, onDeleteItem, onMovimento,
   loading = false, cats: propCats,
+  bodegaRestanti = Infinity,
+  onPaywall = () => {},
+  isPro = false,
 }) {
   const [filterCat,     setFilterCat]     = useState(null);
   const [filterAlert,   setFilterAlert]   = useState(false);
@@ -432,10 +435,26 @@ export default function TabMagazzino({
 
       {/* Toolbar */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={() => { setEditItem(null); setShowForm(true); }}
+        <button onClick={() => {
+            if (bodegaRestanti === 0) { onPaywall("maxBodega"); return; }
+            setEditItem(null); setShowForm(true);
+          }}
           style={{ padding: "9px 18px", background: "#1a365d", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
           ➕ Nuevo artículo
         </button>
+        {isPro ? (
+          <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "3px 10px",
+            color: "#2b6cb0", background: "#ebf8ff", border: "1px solid #bee3f8" }}>
+            ⚡ {items.length} artículos · Pro ilimitado
+          </span>
+        ) : (
+          <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "3px 10px",
+            color:      bodegaRestanti === 0 ? "#c53030" : "#718096",
+            background: bodegaRestanti === 0 ? "#fff5f5" : "#f7fafc",
+            border: `1px solid ${bodegaRestanti === 0 ? "#fed7d7" : "#e2e8f0"}` }}>
+            {bodegaRestanti === 0 ? "⚠️ Límite Free alcanzado" : `${items.length}/10 artículos (Free)`}
+          </span>
+        )}
         {/* 2.7 Import CSV/Excel */}
         <button
           onClick={() => fileInputRef.current?.click()}

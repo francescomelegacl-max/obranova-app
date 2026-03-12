@@ -4,6 +4,13 @@
       "collectionGroup": "members",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
         { "fieldPath": "uid",         "order": "ASCENDING" },
         { "fieldPath": "workspaceId", "order": "ASCENDING" }
       ]

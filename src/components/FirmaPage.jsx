@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { doc, getDoc, updateDoc, query, collectionGroup, where, getDocs } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { LOGO_URL } from "../utils/constants";
+import { LOGO_URL } from "../utils/logo";
 import { fmt } from "../utils/helpers";
 
 const EMPRESA = {

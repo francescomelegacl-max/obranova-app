@@ -3,9 +3,9 @@
 // Ogni componente è piccolo, testabile e senza side-effects.
 
 import { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../lib/firebase";
-import { LOGO_URL } from "../utils/constants";
+// NOTA: auth e signInWithEmailAndPassword NON sono importati qui — passati come prop
+// per evitare TDZ/circular dep nel bundle statico (Vite 5 + esbuild).
+import { LOGO_URL } from "../utils/logo";
 import { fmtPct, fmt } from "../utils/helpers";
 
 // ─── Tooltip ─────────────────────────────────────────────────────────────────
@@ -110,7 +110,7 @@ export const Toast = ({ msg }) => {
 };
 
 // ─── LoginScreen ──────────────────────────────────────────────────────────────
-export const LoginScreen = ({ onLogin }) => {
+export const LoginScreen = ({ onLogin, auth, signIn }) => {
   const [email,   setEmail]   = useState("");
   const [pwd,     setPwd]     = useState("");
   const [err,     setErr]     = useState("");
@@ -119,7 +119,7 @@ export const LoginScreen = ({ onLogin }) => {
   const handle = async () => {
     setLoading(true); setErr("");
     try {
-      const uc = await signInWithEmailAndPassword(auth, email, pwd);
+      const uc = await signIn(auth, email, pwd);
       onLogin(uc.user);
     } catch {
       setErr("Credenciales inválidas.");

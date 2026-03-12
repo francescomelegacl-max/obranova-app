@@ -3,7 +3,8 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import { PieChart } from "../UI";
 import { usePDFSettings } from "./TabSettings";
 import { fmt, fmtPct, calcTotals, calcProjectTotal } from "../../utils/helpers";
-import { CAT_COLORS, EMPRESA, LOGO_URL, ESTADO_COLORS, ESTADO_BG } from "../../utils/constants";
+import { CAT_COLORS, EMPRESA, ESTADO_COLORS, ESTADO_BG } from "../../utils/constants";
+import { LOGO_URL } from "../../utils/logo";
 
 const CC = CAT_COLORS;
 
@@ -213,6 +214,30 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
 
       {/* Print area */}
       <div id="print-area" style={{ background: "white", padding: "28px 24px", maxWidth: 800, margin: "0 auto", borderRadius: 12, boxShadow: "0 1px 8px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
+
+        {/* ── Watermark OBRA NOVA per piano Free (visibile nell'anteprima app) ── */}
+        {!isPro && (
+          <div aria-hidden="true" style={{
+            position: "absolute", inset: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            pointerEvents: "none", zIndex: 1, overflow: "hidden",
+          }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{
+                position: "absolute",
+                top: `${20 + i * 30}%`,
+                left: "-10%", right: "-10%",
+                transform: "rotate(-35deg)",
+                fontSize: 28, fontWeight: 900,
+                color: "rgba(43,108,176,0.13)",
+                whiteSpace: "nowrap", userSelect: "none",
+                letterSpacing: "0.12em", textTransform: "uppercase",
+              }}>
+                OBRA NOVA &nbsp;&nbsp; OBRA NOVA &nbsp;&nbsp; OBRA NOVA &nbsp;&nbsp; OBRA NOVA
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* ── Watermark dinamico stato ── */}
         <div style={{
@@ -865,7 +890,7 @@ function ComparativoProveedores({ listino, cats, catColors, t }) {
   );
 }
 
-export function TabListino({ listino, cats, catColors, newCatName, setNewCatName, onAddCat, onDeleteItem, onAddFromListino, onOpenAddModal, DEFAULT_CATS, t, onUpdatePrecio }) {
+export function TabListino({ listino, cats, catColors, newCatName, setNewCatName, onAddCat, onDeleteItem, onAddFromListino, onOpenAddModal, DEFAULT_CATS, t, onUpdatePrecio, listinoRestanti = Infinity, onPaywall = () => {}, isPro = false }) {
   const [filterCat,    setFilterCat]    = useState(null);
   const [search,       setSearch]       = useState("");
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768);
@@ -924,10 +949,27 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
             </button>
           ))}
         </div>
-        <button onClick={onOpenAddModal}
+        <button onClick={() => listinoRestanti === 0 ? onPaywall("maxListino") : onOpenAddModal()}
           style={{ padding: "8px 16px", background: "#276749", color: "white", border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
           {t.listinoAgregar}
         </button>
+        {isPro ? (
+          <span style={{
+            fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "3px 10px",
+            color: "#2b6cb0", background: "#ebf8ff", border: "1px solid #bee3f8",
+          }}>
+            ⚡ {listino.length} ítems · Pro ilimitado
+          </span>
+        ) : (
+          <span style={{
+            fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "3px 10px",
+            color:      listinoRestanti === 0 ? "#c53030" : "#276749",
+            background: listinoRestanti === 0 ? "#fff5f5" : "#f0fff4",
+            border:     `1px solid ${listinoRestanti === 0 ? "#fed7d7" : "#9ae6b4"}`,
+          }}>
+            {listinoRestanti === 0 ? "⚠️ Límite 20 ítems alcanzado" : `${listino.length}/20 ítems (Free)`}
+          </span>
+        )}
       </div>
 
       {/* ── Vista Comparativo Proveedores ─────────────────────────────────── */}

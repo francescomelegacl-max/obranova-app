@@ -365,7 +365,7 @@ function PartidaCard({ p, cats, updP, delP, onEdit, t }) {
 }
 
 // ── TabCostos — mobile card + desktop table ────────────────────────────────────
-export default function TabCostos({ partidas = [], cats = [], addPartida, updP, delP, dupP, addFromListino, listino = [], t = {}, info = {}, pct = {}, condPago = "", condPagoPersonalizado = "", cuotas = [], iva = false, onApplyTemplate, canExcel = true, canTemplates = true, canPlan, onPaywall }) {
+export default function TabCostos({ partidas = [], cats = [], addPartida, updP, delP, dupP, addFromListino, listino = [], t = {}, info = {}, pct = {}, condPago = "", condPagoPersonalizado = "", cuotas = [], iva = false, onApplyTemplate, canExcel = true, canTemplates = true, canPlan, onPaywall, partidasRestantes = Infinity, isPro = false }) {
   const [filterCat,       setFilterCat]       = useState(null);
   const [showExtras,      setShowExtras]      = useState(false);
   const [editingP,        setEditingP]        = useState(null);
@@ -554,6 +554,25 @@ export default function TabCostos({ partidas = [], cats = [], addPartida, updP, 
           style={{ padding: isMobile ? "12px 20px" : "8px 14px", background: "#276749", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: isMobile ? 15 : 13, flex: isMobile ? 1 : "none" }}>
           ➕ {t.agregar}
         </button>
+        {isPro ? (
+          <span style={{
+            fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "3px 10px",
+            color: "#2b6cb0", background: "#ebf8ff", border: "1px solid #bee3f8",
+          }}>
+            ⚡ {partidas.length} partidas · Pro ilimitado
+          </span>
+        ) : (
+          <span style={{
+            fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "3px 10px",
+            color:      partidasRestantes === 0 ? "#c53030" : "#276749",
+            background: partidasRestantes === 0 ? "#fff5f5" : "#f0fff4",
+            border:     `1px solid ${partidasRestantes === 0 ? "#fed7d7" : "#9ae6b4"}`,
+          }}>
+            {partidasRestantes === 0
+              ? "⚠️ Límite 15 partidas alcanzado"
+              : `${partidas.length}/15 partidas (Free)`}
+          </span>
+        )}
         {!isMobile && (
           <button onClick={() => setShowExtras(v => !v)}
             style={{ marginLeft: "auto", padding: "5px 12px", borderRadius: 8, border: "1px solid #e2e8f0", background: showExtras ? "#2b6cb0" : "white", color: showExtras ? "white" : "#718096", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
