@@ -11,6 +11,7 @@ import {
   deleteDoc, updateDoc, query, where
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
+import { handleError } from "../utils/errorHandler";
 
 export const ROLES = {
   OWNER:  "owner",   // titolare — accesso totale
@@ -59,8 +60,7 @@ export function useWorkspace({ onToast }) {
       setWorkspaces(list);
       return list;
     } catch (e) {
-      console.error("loadWorkspaces:", e);
-      return [];
+      return handleError(e, { context: "loadWorkspaces", fallback: [] });
     } finally {
       setLoadingWS(false);
     }
@@ -78,7 +78,7 @@ export function useWorkspace({ onToast }) {
       snap.forEach(d => list.push({ uid: d.id, ...d.data() }));
       setMembers(list);
     } catch (e) {
-      console.error("loadMembers:", e);
+      handleError(e, { context: "loadMembers" });
     }
   }, []);
 
@@ -111,9 +111,7 @@ export function useWorkspace({ onToast }) {
       onToast("✅ Azienda creata!");
       return { id: ref.id, ...wsData, myRole: ROLES.OWNER };
     } catch (e) {
-      console.error("createWorkspace:", e);
-      onToast("❌ Errore nella creazione: " + e.message);
-      return null;
+      return handleError(e, { context: "createWorkspace", onToast, fallback: null });
     }
   }, [onToast]);
 
@@ -139,9 +137,7 @@ export function useWorkspace({ onToast }) {
       onToast(`✅ Invito inviato a ${email}`);
       return true;
     } catch (e) {
-      console.error("inviteMember:", e);
-      onToast("❌ Errore: " + e.message);
-      return false;
+      return handleError(e, { context: "inviteMember", onToast, fallback: false });
     }
   }, [workspace, onToast]);
 
@@ -161,8 +157,7 @@ export function useWorkspace({ onToast }) {
       snap.forEach(d => list.push({ id: d.id, ...d.data() }));
       return list;
     } catch (e) {
-      console.error("loadPendingInvites:", e);
-      return [];
+      return handleError(e, { context: "loadPendingInvites", fallback: [] });
     }
   }, []);
 
@@ -183,9 +178,7 @@ export function useWorkspace({ onToast }) {
       onToast(`✅ Sei entrato in ${invite.workspaceName}`);
       return true;
     } catch (e) {
-      console.error("acceptInvite:", e);
-      onToast("❌ Errore: " + e.message);
-      return false;
+      return handleError(e, { context: "acceptInvite", onToast, fallback: false });
     }
   }, [onToast]);
 
@@ -195,8 +188,7 @@ export function useWorkspace({ onToast }) {
       await updateDoc(doc(db, "invites", inviteId), { status: "rejected" });
       return true;
     } catch (e) {
-      console.error("rejectInvite:", e);
-      return false;
+      return handleError(e, { context: "rejectInvite", fallback: false });
     }
   }, []);
 

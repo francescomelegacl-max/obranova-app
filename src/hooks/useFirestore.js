@@ -7,6 +7,7 @@ import { doc, setDoc, collection, getDocs, deleteDoc, updateDoc } from "firebase
 import { auth, db } from "../lib/firebase";
 import { DEFAULT_CATS } from "../utils/constants";
 import { mkVacioState } from "./useProyecto";
+import { handleError } from "../utils/errorHandler";
 
 export function useFirestore({ onToast, workspaceId }) {
   const [proyectos, setProyectos] = useState([]);
@@ -37,7 +38,7 @@ export function useFirestore({ onToast, workspaceId }) {
       setProyectos(list);
       setFotosMap(fm);
       return list;
-    } catch (e) { console.error("loadProyectos:", e); return []; }
+    } catch (e) { return handleError(e, { context: "loadProyectos", fallback: [] }); }
   }, [basePath]);
 
   const saveProyecto = useCallback(async (currentId, proyState, manual = false) => {
@@ -61,9 +62,7 @@ export function useFirestore({ onToast, workspaceId }) {
       if (manual) { await loadProyectos(); onToast("💾 Guardado ✔"); }
       return id;
     } catch (e) {
-      console.error("saveProyecto:", e);
-      if (manual) onToast("⚠️ Error al guardar: " + e.message);
-      return null;
+      return handleError(e, { context: "saveProyecto", onToast: manual ? onToast : null, fallback: null });
     } finally { setGuardando(false); }
   }, [basePath, loadProyectos, onToast]);
 
@@ -94,7 +93,7 @@ export function useFirestore({ onToast, workspaceId }) {
       snap.forEach(d => list.push({ id: d.id, ...d.data() }));
       list.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
       setListino(list);
-    } catch (e) { console.error("loadListino:", e); }
+    } catch (e) { handleError(e, { context: "loadListino" }); }
   }, [basePath]);
 
   const saveListinoItem = useCallback(async (form) => {
@@ -105,7 +104,7 @@ export function useFirestore({ onToast, workspaceId }) {
       await setDoc(ref, { ...form, updatedAt: new Date().toISOString() });
       await loadListino();
       onToast("✅ Guardado en listino");
-    } catch (e) { onToast("⚠️ Error: " + e.message); console.error(e); }
+    } catch (e) { handleError(e, { context: "saveListinoItem", onToast }); }
   }, [basePath, loadListino, onToast]);
 
   const deleteListinoItem = useCallback(async (id) => {
@@ -125,8 +124,7 @@ export function useFirestore({ onToast, workspaceId }) {
       setListino(l => l.map(x => x.id === id ? { ...x, ...updates } : x));
       onToast("✅ Giacenza aggiornata");
     } catch (e) {
-      console.error("updateGiacenza:", e);
-      onToast("⚠️ Errore: " + e.message);
+      handleError(e, { context: "updateGiacenza", onToast });
     }
   }, [basePath, onToast]);
 
@@ -151,7 +149,7 @@ export function useFirestore({ onToast, workspaceId }) {
       snap.forEach(d => extra.push(d.data().nombre));
       const merged = [...DEFAULT_CATS, ...extra.filter(c => !DEFAULT_CATS.includes(c))];
       setCats(merged);
-    } catch (e) { console.error("loadCats:", e); }
+    } catch (e) { handleError(e, { context: "loadCats" }); }
   }, [basePath]);
 
   const addCat = useCallback(async (name, t) => {
@@ -162,7 +160,7 @@ export function useFirestore({ onToast, workspaceId }) {
       await setDoc(ref, { nombre: name, createdAt: new Date().toISOString() });
       setCats(c => [...c, name]);
       onToast(t?.catGuardada || "✅ Categoría guardada");
-    } catch (e) { onToast("⚠️ Error"); console.error(e); }
+    } catch (e) { handleError(e, { context: "addCat", onToast }); }
   }, [basePath, cats, onToast]);
 
   return {

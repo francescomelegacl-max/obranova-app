@@ -4,6 +4,7 @@
 import { useState, useCallback } from "react";
 import { doc, setDoc, getDoc, collection, collectionGroup, getDocs, updateDoc, query, where } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
+import { handleError } from "../utils/errorHandler";
 
 export const FIRMA_STATI = {
   PENDING:   "pending",
@@ -70,9 +71,7 @@ export function useFirma({ workspaceId, onToast }) {
       onToast("✅ Link di firma creato!");
       return { token, url };
     } catch (e) {
-      onToast("❌ Errore: " + e.message);
-      console.error(e);
-      return null;
+      return handleError(e, { context: "creaLinkFirma", onToast, fallback: null });
     } finally {
       setLoading(false);
     }
@@ -91,7 +90,7 @@ export function useFirma({ workspaceId, onToast }) {
       list.sort((a, b) => (b.creadoAt || "").localeCompare(a.creadoAt || ""));
       setFirme(list);
       return list;
-    } catch (e) { console.error("loadFirme:", e); return []; }
+    } catch (e) { return handleError(e, { context: "loadFirme", fallback: [] }); }
   }, [workspaceId, base]);
 
   // ── Carica dati firma pubblica (senza auth) ───────────────────────────────
@@ -111,7 +110,7 @@ export function useFirma({ workspaceId, onToast }) {
         firma:    { id: firmaDoc.id, ...firmaData },
         proyecto: proySnap.exists() ? { id: proySnap.id, ...proySnap.data() } : null,
       };
-    } catch (e) { console.error("loadFirmaPubblica:", e); return null; }
+    } catch (e) { return handleError(e, { context: "loadFirmaPubblica", fallback: null }); }
   }, []);
 
   // ── Salva firma del cliente ───────────────────────────────────────────────
@@ -132,7 +131,7 @@ export function useFirma({ workspaceId, onToast }) {
         updatedAt: new Date().toISOString(),
       });
       return true;
-    } catch (e) { console.error("salvaFirma:", e); return false; }
+    } catch (e) { return handleError(e, { context: "salvaFirma", fallback: false }); }
     finally { setLoading(false); }
   }, []);
 
@@ -151,7 +150,7 @@ export function useFirma({ workspaceId, onToast }) {
         updatedAt: new Date().toISOString(),
       });
       return true;
-    } catch (e) { console.error("rifiutaFirma:", e); return false; }
+    } catch (e) { return handleError(e, { context: "rifiutaFirma", fallback: false }); }
   }, []);
 
   // ── Copia link negli appunti ──────────────────────────────────────────────
