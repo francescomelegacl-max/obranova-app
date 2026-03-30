@@ -21,6 +21,38 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.env  
- 
-dist/ 
+.env
+
+# Build output
+dist/
+
+# Windows
+desktop.ini
+Thumbs.db
+
+# Archivi e backup
+*.zip
+*.rar
+*.tar.gz
+src_backup*/
+src_BACKUP*/
+
+# Firebase
+.firebase/
+firebase-debug.log
+.firebaserc.backup
+
+# Script temporanei
+patch_legal.py
+/index.js
+/useEmpleados.js
+
+# Cartelle errore/vuote
+/cd
+/firebase
+
+# Claude Code
+.claude/
+
+# Backup config
+*.backup 
