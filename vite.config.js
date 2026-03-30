@@ -18,7 +18,6 @@ export default defineConfig({
           'firebase-core':      ['firebase/app', 'firebase/auth'],
           'firebase-firestore': ['firebase/firestore'],
           'firebase-analytics': ['firebase/analytics'],
-          'xlsx':               ['xlsx'],
           'recharts':           ['recharts'],
         }
       }

@@ -4,14 +4,13 @@ import { MOVIMENTO_TYPES, MOVIMENTO_LABELS } from "../../hooks/useMagazzino";
 import { fmt } from "../../utils/helpers";
 import { DEFAULT_CATS } from "../../utils/constants";
 import { CAT_COLORS, catColor, CategoryChips, CategoryDivider, CategoryDividerMobile } from "../ui/CategoryFilters";
-import * as XLSX from "xlsx";
-
 // ── Parsing CSV/Excel → array di oggetti normalizzati ─────────────────────────
 function parseImportFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
+        const XLSX = await import("xlsx");
         const wb = XLSX.read(e.target.result, { type: "binary" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { defval: "" });

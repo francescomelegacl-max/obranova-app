@@ -2,11 +2,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { fmt } from "../../utils/helpers";
 import { catColor, CategoryChips, CategoryDivider, CategoryDividerMobile } from "../ui/CategoryFilters";
-import * as XLSX from "xlsx";
 import { useTemplates, CATEGORIAS } from "../../hooks/useTemplates";
 
 // ── Export Excel partidas per categoria ───────────────────────────────────────
-function exportExcelCostos(partidas, cats, info = {}) {
+async function exportExcelCostos(partidas, cats, info = {}) {
+  const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
 
   // ── Foglio 1: Dettaglio partidas raggruppate per categoria ────────────────
