@@ -63,13 +63,13 @@ const PaginaFirma   = lazy(() => import("./components/FirmaPage"));
 const AdminDashboard= lazy(() => import("./components/tabs/AdminDashboard"));
 const LandingPage    = lazy(() => import("./components/LandingPage"));
 
-// ── OtherTabs — lazy con named export wrapper (fix: no await top-level) ───────
-const TabResumen     = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabResumen })));
-const TabVistaCliente= lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabVistaCliente })));
-const TabProyectos   = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabProyectos })));
-const TabListino     = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabListino })));
-const TabStorico     = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabStorico })));
-const TabHelp        = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabHelp })));
+// ── OtherTabs — file separati, un componente per file ────────────────────────
+const TabResumen      = lazy(() => import("./components/tabs/TabResumen"));
+const TabVistaCliente = lazy(() => import("./components/tabs/TabVistaCliente"));
+const TabProyectos    = lazy(() => import("./components/tabs/TabProyectos"));
+const TabListino      = lazy(() => import("./components/tabs/TabListino"));
+const TabStorico      = lazy(() => import("./components/tabs/TabStorico"));
+const TabHelp         = lazy(() => import("./components/tabs/TabHelp"));
 
 // Fallback caricamento tab
 const TabLoader = () => (
