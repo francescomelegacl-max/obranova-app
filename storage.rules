@@ -1,0 +1,37 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Render AI: foto temporanee (scritte da CF via Admin SDK)
+    match /renders/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Fotos progetto: upload dal client
+    match /workspaces/{wsId}/fotos/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Logo azienda: pubblico in lettura
+    match /workspaces/{wsId}/logo/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Backup: solo Admin SDK
+    match /backups/{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Default: blocca
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
