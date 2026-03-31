@@ -50,58 +50,179 @@ a { color: #2b6cb0; text-decoration: inherit; }
 }
 
 /* ─── Mobile: touch targets e layout ───────────────────────────── */
-@media (max-width: 640px) {
-  /* Bottoni header più grandi al tocco */
+@media (max-width: 767px) {
   header button { min-height: 40px; }
-
-  /* Nav tab scrollabile, niente scrollbar visibile */
   nav {
     -webkit-overflow-scrolling: touch;
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
   }
   nav::-webkit-scrollbar { display: none; }
-
-  /* Tab singolo: snap + altezza minima 44px (touch target Apple HIG) */
   nav button[role="tab"] {
     scroll-snap-align: start;
     min-height: 44px;
   }
-
-  /* Padding ridotto su mobile */
   main { padding: 8px !important; }
-
-  /* Input più alti: 16px evita zoom automatico su iOS */
   input, select, textarea { min-height: 40px; font-size: 16px !important; }
-
-  /* Bottoni stato più toccabili */
   button { min-height: 36px; }
 }
 
 /* ─── Tablet: layout ibrido ─────────────────────────────────────── */
-@media (min-width: 641px) and (max-width: 1024px) {
+@media (min-width: 768px) and (max-width: 1024px) {
   nav { scrollbar-width: none; }
   nav::-webkit-scrollbar { display: none; }
 }
 
+/* print-only: visibile solo in stampa */
+.print-only { display: none !important; }
+
 /* ─── Print: PDF professionale ──────────────────────────────────── */
 @media print {
-  @page { margin: 15mm 12mm; size: A4 portrait; }
+  @page { margin: 10mm 10mm; size: A4 portrait; }
 
-  body { background: white !important; color: #1a1a1a !important; font-size: 11pt; }
+  html, body { height: auto !important; overflow: visible !important; }
+  body { background: white !important; color: #1a1a1a !important; font-size: 10.5pt; }
 
-  .no-print { display: none !important; }
+  /*
+   * STRATEGIA CORRETTA
+   * ──────────────────
+   * Problema: #print-area è figlio di main, non di body.
+   *   - "body * { display:none }" nasconde main → #print-area non renderizza
+   *     anche se poi impostiamo "display:revert" su di esso (padre è none).
+   *   - "body > * { visibility:hidden }" + "#print-area * { visibility:visible }"
+   *     non nasconde i .no-print fratelli di #print-area dentro main perché
+   *     main non è body > * ma un figlio intermedio.
+   *
+   * Soluzione a 2 livelli:
+   *   A) visibility:hidden su body (non body > *, ma body stesso) →
+   *      nasconde tutto incluso main e i suoi figli
+   *   B) visibility:visible su #print-area e i suoi figli →
+   *      funziona anche se main è nascosto, perché visibility si propaga
+   *      ai discendenti ma può essere sovrascritto indipendentemente
+   *   C) display:none esplicito su .no-print DENTRO #print-area →
+   *      previene che visibility:visible li faccia riapparire
+   *   D) display:none esplicito su aside, header, nav →
+   *      fallback per elementi con inline style React
+   *
+   * PERCHÉ visibility e non display:
+   *   Con visibility, un figlio può essere visibility:visible anche se
+   *   il padre è visibility:hidden. Con display:none, i figli non possono
+   *   mai sovrascrivere il padre — è per questo che "display:revert" falliva.
+   */
 
-  /* Evita interruzioni di pagina nelle sezioni */
+  /* Livello A: nascondi tutto tramite body */
+  body { visibility: hidden !important; }
+
+  /* Livello B: mostra #print-area e tutto il suo contenuto */
+  #print-area,
+  #print-area * { visibility: visible !important; }
+
+  /* Livello C: .no-print dentro #print-area restano nascosti */
+  #print-area .no-print,
+  #print-area .no-print * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Livello D: .print-only visibile */
+  .print-only,
+  #print-area .print-only {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Layout di #print-area */
+  #print-area {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 16px !important;
+    margin: 0 !important;
+    background: white !important;
+    overflow: visible !important;
+    z-index: 99999 !important;
+  }
+
+  /* main: azzera margine laterale lasciato dalla sidebar */
+  main { margin-left: 0 !important; width: 100% !important; padding: 0 !important; }
+
+  /* Fallback esplicito per elementi con inline style React che
+     potrebbero non essere coperti da visibility:hidden su body */
+  aside,
+  aside * { display: none !important; visibility: hidden !important; }
+  #app-sidebar,
+  #app-sidebar * {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    overflow: hidden !important;
+  }
+  header { display: none !important; visibility: hidden !important; }
+  nav { display: none !important; visibility: hidden !important; }
+
+  /* Toast e modal floating */
+  div[style*="z-index: 99999"],
+  div[style*="zIndex: 99999"],
+  div[style*="position: fixed"][style*="inset"],
+  div[style*="position: fixed"][style*="z-index: 8000"],
+  div[style*="position: fixed"][style*="zIndex: 8000"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* No interruzioni di pagina */
   table, .print-block { page-break-inside: avoid; break-inside: avoid; }
   tr { page-break-inside: avoid; }
+  .print-footer {
+    page-break-before: avoid;
+    break-before: avoid;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
 
-  /* Forza stampa dei colori (intestazione tabella, badge stato ecc.) */
+  /* Forza stampa dei colori */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Nasconde ombre e bordi inutili */
   [style*="boxShadow"] { box-shadow: none !important; }
+}
+
+/* ─── Bottom Navigation Bar ─────────────────────────────────────── */
+@media (max-width: 767px) {
+  nav.bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
+  aside { display: none !important; }
+  .sidebar-hidden { display: none !important; }
+  html, body { overflow-x: hidden !important; }
+  main { overflow-x: hidden !important; }
+  .kpi-card { min-height: 0 !important; padding: 10px 12px !important; }
+  .recharts-wrapper { max-width: 100% !important; }
+  .recharts-surface { overflow: visible; }
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+
+/* ─── Print: nascondi bottom nav ────────────────────────────────── */
+@media print {
+  nav[style*="position: fixed"] { display: none !important; }
+}
+
+/* ─── Classe .is-printing: applicata da JS in beforeprint ───────── */
+body.is-printing .no-print { display: none !important; }
+body.is-printing aside,
+body.is-printing #app-sidebar,
+body.is-printing header,
+body.is-printing nav { display: none !important; }
+body.is-printing #print-area {
+  position: static !important;
+  width: 100% !important;
+  background: white !important;
+  padding: 16px !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
 }

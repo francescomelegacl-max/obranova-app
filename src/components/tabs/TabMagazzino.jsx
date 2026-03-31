@@ -1,18 +1,19 @@
 // ─── components/tabs/TabMagazzino.jsx ───────────────────────────────────────
 import { useState, useMemo, useRef } from "react";
+import PanelSolicitudes from "../PanelSolicitudes";
 import { MOVIMENTO_TYPES, MOVIMENTO_LABELS } from "../../hooks/useMagazzino";
 import { fmt } from "../../utils/helpers";
 import { DEFAULT_CATS } from "../../utils/constants";
 import { CAT_COLORS, catColor, CategoryChips, CategoryDivider, CategoryDividerMobile } from "../ui/CategoryFilters";
+
 // ── Parsing CSV/Excel → array di oggetti normalizzati ─────────────────────────
 function parseImportFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const XLSX = await import("xlsx");
+        const XLSX = await import("xlsx"); // lazy — caricato solo all'import file
         const wb = XLSX.read(e.target.result, { type: "binary" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { defval: "" });
         // Normalizza nomi colonne (case insensitive, alias comuni)
         const MAP = {
@@ -276,11 +277,19 @@ export default function TabMagazzino({
   bodegaRestanti = Infinity,
   onPaywall = () => {},
   isPro = false,
+  // Solicitudes
+  solicitudes = [],
+  solicitudesLoading = false,
+  onAprobarSolicitud,
+  onRechazarSolicitud,
+  user,
 }) {
   const [filterCat,     setFilterCat]     = useState(null);
   const [filterAlert,   setFilterAlert]   = useState(false);
   const [search,        setSearch]        = useState("");
   const [showMovimenti, setShowMovimenti] = useState(false);
+  const [activeView,   setActiveView]   = useState("stock"); // "stock" | "solicitudes"
+  const pendientesSol = solicitudes.filter(s => s.estado === "pendiente").length;
   const [showForm,      setShowForm]      = useState(false);
   const [editItem,      setEditItem]      = useState(null);
   const [movItem,       setMovItem]       = useState(null);
@@ -432,6 +441,49 @@ export default function TabMagazzino({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
+      {/* Tab switcher Stock / Solicitudes */}
+      <div style={{ display: "flex", gap: 6, borderBottom: "1px solid #e2e8f0", paddingBottom: 8 }}>
+        {[
+          { id: "stock",       label: "📦 Inventario" },
+          { id: "solicitudes", label: "📋 Solicitudes", badge: pendientesSol },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveView(tab.id)} style={{
+            padding: "8px 16px", borderRadius: "8px 8px 0 0", border: "none",
+            cursor: "pointer", fontWeight: 700, fontSize: 13,
+            background: activeView === tab.id ? "#1a365d" : "#f0f4f8",
+            color:      activeView === tab.id ? "white"   : "#718096",
+            position: "relative",
+          }}>
+            {tab.label}
+            {tab.badge > 0 && (
+              <span style={{
+                position: "absolute", top: -6, right: -6,
+                background: "#e53e3e", color: "white",
+                borderRadius: "50%", width: 18, height: 18,
+                fontSize: 10, fontWeight: 800,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>{tab.badge}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Vista Solicitudes ────────────────────────────────────────────── */}
+      {activeView === "solicitudes" && (
+        <PanelSolicitudes
+          solicitudes={solicitudes}
+          loading={solicitudesLoading}
+          bodegaItems={items}
+          onAprobar={onAprobarSolicitud}
+          onRechazar={onRechazarSolicitud}
+          onMovimento={onMovimento}
+          user={user}
+        />
+      )}
+
+      {/* ── Vista Stock (esistente) ─────────────────────────────────────── */}
+      {activeView === "stock" && <>
+
       {/* Toolbar */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <button onClick={() => {
@@ -524,9 +576,29 @@ export default function TabMagazzino({
       {loading ? (
         <div style={{ textAlign: "center", padding: "50px 0", color: "#a0aec0" }}>Caricamento...</div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "50px 0", color: "#a0aec0", background: "white", borderRadius: 12 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>📦</div>
-          <div>{items.length === 0 ? "Bodega vacía. ¡Agrega el primer artículo!" : "Ningún artículo encontrado."}</div>
+        <div style={{ textAlign: "center", padding: "50px 24px", color: "#a0aec0", background: "white", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
+          {items.length === 0 ? (
+            <>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>🏭</div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#1a365d", marginBottom: 8 }}>Tu bodega está vacía</div>
+              <div style={{ fontSize: 13, color: "#718096", maxWidth: 280, margin: "0 auto 20px", lineHeight: 1.6 }}>
+                Controla tu stock de materiales, recibe alertas cuando baje del mínimo y registra entradas y salidas
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 16 }}>
+                {["📦 Stock actual", "⚠️ Alerta mínimo", "📊 Movimientos"].map((s, i) => (
+                  <div key={i} style={{ background: "#f0fff4", border: "1px solid #9ae6b4", borderRadius: 8, padding: "6px 12px", fontSize: 11, color: "#276749", fontWeight: 600 }}>
+                    {i + 1}. {s}
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: "#a0aec0" }}>👆 Usa <strong>+ Nuevo artículo</strong> para empezar</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>🔍</div>
+              <div style={{ fontWeight: 600, color: "#4a5568" }}>Ningún artículo encontrado</div>
+            </>
+          )}
         </div>
       ) : (
         <div style={{ background: "white", borderRadius: 12, overflow: "auto", boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
@@ -578,6 +650,8 @@ export default function TabMagazzino({
           onClose={() => setImportPreview(null)}
         />
       )}
+      </> /* fine stock view */}
+
     </div>
   );
 }

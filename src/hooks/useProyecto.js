@@ -17,15 +17,7 @@ export const mkVacioState = () => ({
     fecha: todayStr(), fechaInicio: "", fechaTermino: "",
     telefono: "", email: "",
   },
-  partidas: [
-    { id: 1, cat: "Obra Gruesa",    nombre: "Excavación y fundaciones",  unidad: "m²", cant: 0, pu: 0, visible: true, proveedor: "", nota: "" },
-    { id: 2, cat: "Obra Gruesa",    nombre: "Radier",                     unidad: "m²", cant: 0, pu: 0, visible: true, proveedor: "", nota: "" },
-    { id: 3, cat: "Obra Gruesa",    nombre: "Estructura muros y pilares", unidad: "m²", cant: 0, pu: 0, visible: true, proveedor: "", nota: "" },
-    { id: 4, cat: "Instalaciones",  nombre: "Instalación eléctrica",      unidad: "gl", cant: 1, pu: 0, visible: true, proveedor: "", nota: "" },
-    { id: 5, cat: "Instalaciones",  nombre: "Gasfitería / Sanitario",     unidad: "gl", cant: 1, pu: 0, visible: true, proveedor: "", nota: "" },
-    { id: 6, cat: "Terminaciones",  nombre: "Revestimientos y cerámica",  unidad: "m²", cant: 0, pu: 0, visible: true, proveedor: "", nota: "" },
-    { id: 7, cat: "Terminaciones",  nombre: "Pintura interior/exterior",  unidad: "m²", cant: 0, pu: 0, visible: true, proveedor: "", nota: "" },
-  ],
+  partidas: [],
   pct: { ci: 10, gf: 5, imprevistos: 5, utilidad: 10 },
   estado: "Borrador",
   catVis: {},
@@ -33,8 +25,10 @@ export const mkVacioState = () => ({
   validez: 30,
   iva: true,
   condPago: "cuotas",
-  cuotas: [{ monto: 0, fecha: "", desc: "Pie" }],
+  cuotas: [{ monto: 0, tipo: "pct", fecha: "", desc: "Pie", mpLink: "" }],
   condPagoPersonalizado: "",
+  transferencia: { banco: "", cuenta: "", rutTitular: "", nota: "" },
+  descuento: { tipo: "pct", valor: 0, descripcion: "" },
   currentId: null,
 });
 
@@ -55,8 +49,10 @@ function reducer(state, action) {
         validez:              p.validez              ?? 30,
         iva:                  p.iva                  !== undefined ? p.iva : true,
         condPago:             p.condPago             || "cuotas",
-        cuotas:               p.cuotas               || [{ monto: 0, fecha: "", desc: "Pie" }],
+        cuotas:               (p.cuotas || [{ monto: 0, tipo: "pct", fecha: "", desc: "Pie", mpLink: "" }]).map(c => ({ tipo: "pct", mpLink: "", ...c })),
         condPagoPersonalizado:p.condPagoPersonalizado|| "",
+        transferencia:        p.transferencia        || { banco: "", cuenta: "", rutTitular: "", nota: "" },
+        descuento:            p.descuento            || { tipo: "pct", valor: 0, descripcion: "" },
         catVis:               p.catVis               || {},
         currentId:            p.id,
       };
@@ -85,6 +81,9 @@ function reducer(state, action) {
 
     case "SET_COND_PAGO_PERSONALIZADO":
       return { ...state, condPagoPersonalizado: action.payload };
+
+    case "SET_TRANSFERENCIA":
+      return { ...state, transferencia: { ...state.transferencia, ...action.payload } };
 
     case "SET_CUOTAS":
       return { ...state, cuotas: action.payload };
@@ -175,6 +174,7 @@ export function useProyecto() {
   const setCondPago= useCallback((v)     => dispatch({ type: "SET_COND_PAGO", payload: v }),   []);
   const setCondPagoPersonalizado = useCallback((v) => dispatch({ type: "SET_COND_PAGO_PERSONALIZADO", payload: v }), []);
   const setCuotas  = useCallback((v)     => dispatch({ type: "SET_CUOTAS",  payload: v }),     []);
+  const setTransferencia = useCallback((patch) => dispatch({ type: "SET_TRANSFERENCIA", payload: patch }), []);
   const setFotos   = useCallback((v)     => dispatch({ type: "SET_FOTOS",   payload: typeof v === "function" ? v(state.fotos) : v }), [state.fotos]);
   const setCatVisKey = useCallback((cat, key, value) => dispatch({ type: "SET_CAT_VIS", payload: { cat, key, value } }), []);
 
@@ -191,7 +191,7 @@ export function useProyecto() {
     dispatch,
     loadProject,
     setInfo, setPct, setEstado, setIva, setValidez,
-    setCondPago, setCondPagoPersonalizado, setCuotas,
+    setCondPago, setCondPagoPersonalizado, setCuotas, setTransferencia,
     setFotos, setCatVisKey, getCatVis,
     addPartida, addFromListino, updP, delP, dupP,
   };

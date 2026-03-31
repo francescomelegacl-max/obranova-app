@@ -3,7 +3,7 @@
 // aggiunge mano d'obra e ottiene un totale in secondi — senza creare un progetto.
 // Può salvare il calcolo, esportare PDF e condividere su WhatsApp.
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 
 const fmt = (n) => new Intl.NumberFormat("es-CL", {
   style: "currency", currency: "CLP", maximumFractionDigits: 0,
@@ -74,10 +74,10 @@ function RigaCalc({ riga, onUpdate, onDelete, catColor }) {
 }
 
 // ── Componente principale ─────────────────────────────────────────────────────
-export default function TabCalcolatore({ listino = [], standalone = false, addPartida, cats = [], onToast, canAdd = () => true, calcRestanti = Infinity, onPaywall = () => {} }) {
+export default function TabCalcolatore({ listino = [], standalone = false, addPartida, cats = [], onToast, canAdd = () => true, calcRestanti = Infinity, onPaywall = () => {}, initialRighe = null, initialNome = "" }) {
 
-  const [righe,      setRighe]      = useState([]);
-  const [nome,       setNome]       = useState("");
+  const [righe,      setRighe]      = useState(() => initialRighe || []);
+  const [nome,       setNome]       = useState(initialNome || "");
   const [margine,    setMargine]    = useState(20);
   const [iva,        setIva]        = useState(false);
   const [calcSalvati,setCalcSalvati]= useState(() => {
@@ -86,6 +86,16 @@ export default function TabCalcolatore({ listino = [], standalone = false, addPa
   const [showListino, setShowListino] = useState(false);
   const [searchMat,   setSearchMat]   = useState("");
   const [saved,       setSaved]       = useState(false);
+
+  // ── Sync quando arrivano righe pre-popolate dal kit ──────────────────────
+  const prevInitialRef = useRef(initialRighe);
+  useEffect(() => {
+    if (initialRighe && initialRighe !== prevInitialRef.current) {
+      prevInitialRef.current = initialRighe;
+      setRighe(initialRighe.map(r => ({ ...r, id: Math.random().toString(36).slice(2) })));
+      if (initialNome) setNome(initialNome);
+    }
+  }, [initialRighe, initialNome]);
 
   // ── Calcoli ─────────────────────────────────────────────────────────────────
   const totals = useMemo(() => {
@@ -265,6 +275,21 @@ export default function TabCalcolatore({ listino = [], standalone = false, addPa
           Estima el costo de un trabajo en segundos — sin crear un proyecto
         </div>
       </div>
+
+      {/* Banner kit pre-cargado */}
+      {initialRighe && initialRighe.length > 0 && (
+        <div style={{ background:"#f3e8ff",borderRadius:10,padding:"10px 14px",border:"1px solid #d6bcfa",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8 }}>
+          <div style={{ fontSize:13,color:"#553c9a",fontWeight:600 }}>
+            📦 Kit cargado: <strong>{initialNome}</strong> — {righe.length} materiales
+          </div>
+          <div style={{ fontSize:11,color:"#6b46c1",display:"flex",gap:12 }}>
+            <span>✅ {righe.filter(r=>r._listinoHit||r._magHit).length} precios del listino/bodega</span>
+            {righe.filter(r=>!r._listinoHit&&!r._magHit).length > 0 && (
+              <span style={{color:"#c05621"}}>⚠️ {righe.filter(r=>!r._listinoHit&&!r._magHit).length} sin precio — completa manualmente</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Nome calcolo + margine */}
       <div style={{ background:"white",borderRadius:12,padding:16,boxShadow:"0 1px 4px rgba(0,0,0,.07)",display:"flex",gap:12,flexWrap:"wrap",alignItems:"center" }}>

@@ -1,5 +1,7 @@
 // ─── components/tabs/TabSettings.jsx ────────────────────────────────────────
 import { useState } from "react";
+import { deleteUser, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { auth } from "../../lib/firebase";
 import { ROLES, ROLE_LABELS, ROLE_COLORS } from "../../hooks/useWorkspace";
 
 // ─── Helper: legge/scrive impostazioni PDF in localStorage ───────────────────
@@ -140,7 +142,7 @@ function DatosTributariosSection() {
 
 // ─── Sezione personalizzazione PDF ───────────────────────────────────────────
 function PDFSettingsSection({ plan = "free", onGoToPiani }) {
-  const isPro = plan === "pro" || plan === "team" || plan === "enterprise";
+  const isPro = plan === "pro" || plan === "empresa";
 
   const [cfg, setCfg] = useState(() => {
     const saved = localStorage.getItem("pdf_settings");
@@ -365,10 +367,561 @@ function ReferralCard({ workspace, userEmail, onToast }) {
   );
 }
 
+
+// ── ScadenzarioSection ────────────────────────────────────────────────────────
+// Configura i giorni prima del reminder automatico sui preventivi Enviados.
+// Scrive workspace.reminderDias su Firestore — letto da scadenzarioReminder cron.
+function ScadenzarioSection({ workspace, can, onToast }) {
+  const [dias,    setDias]    = useState(workspace?.reminderDias ?? 7);
+  const [saving,  setSaving]  = useState(false);
+  const [saved,   setSaved]   = useState(false);
+
+  const handleSave = async () => {
+    if (!workspace?.id) return;
+    const val = parseInt(dias, 10);
+    if (!val || val < 1 || val > 60) { onToast?.("⚠️ Ingresa un valor entre 1 y 60 días"); return; }
+    setSaving(true);
+    try {
+      const { doc, updateDoc } = await import("firebase/firestore");
+      const { db } = await import("../../lib/firebase");
+      await updateDoc(doc(db, "workspaces", workspace.id), { reminderDias: val });
+      onToast?.("✅ Configuración guardada");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      onToast?.("⚠️ Error al guardar: " + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isPro = ["pro","empresa"].includes(workspace?.plan);
+
+  return (
+    <div style={{ background:"white",borderRadius:12,padding:18,boxShadow:"0 1px 4px rgba(0,0,0,.07)" }}>
+      <div style={{ fontWeight:700,fontSize:14,color:"#1a365d",marginBottom:4,borderBottom:"2px solid #ebf8ff",paddingBottom:7 }}>
+        ⏰ Recordatorios automáticos
+      </div>
+      <div style={{ fontSize:12,color:"#718096",marginBottom:14 }}>
+        Obra Nova te avisa por email cuando un presupuesto enviado no recibe respuesta.
+        Se envían dos recordatorios: el primero a los X días, el segundo a los 2X días.
+      </div>
+      {!isPro ? (
+        <div style={{ background:"#faf5ff",border:"1px solid #e9d8fd",borderRadius:10,padding:"12px 14px",fontSize:12,color:"#553c9a",fontWeight:600 }}>
+          ⚡ Los recordatorios automáticos están disponibles en el plan Pro y superior.
+        </div>
+      ) : (
+        <div style={{ display:"flex",alignItems:"center",gap:12,flexWrap:"wrap" }}>
+          <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+            <label style={{ fontSize:13,color:"#4a5568",fontWeight:600 }}>
+              Días sin respuesta antes del primer aviso:
+            </label>
+            <input
+              type="number"
+              value={dias}
+              min={1}
+              max={60}
+              onChange={e => setDias(e.target.value)}
+              disabled={!can("manage_workspace")}
+              style={{
+                width:60,padding:"7px 10px",border:"1px solid #e2e8f0",
+                borderRadius:8,fontSize:14,fontWeight:700,color:"#1a365d",
+                textAlign:"center",
+              }}
+            />
+            <span style={{ fontSize:12,color:"#a0aec0" }}>días (2° aviso a los {(parseInt(dias,10)||7)*2} días)</span>
+          </div>
+          {can("manage_workspace") && (
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                padding:"8px 18px",
+                background: saved ? "#276749" : "#1a365d",
+                color:"white",border:"none",borderRadius:8,
+                cursor:"pointer",fontWeight:700,fontSize:13,
+                transition:"background .2s",
+              }}
+            >
+              {saving ? "Guardando..." : saved ? "✅ Guardado" : "Guardar"}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── BackupSection ─────────────────────────────────────────────────────────────
+function BackupSection({ onBackup, onToast, can, userEmail }) {
+  const ADMIN_EMAILS = ["francescomelega.cl@gmail.com", "obranovaspa@gmail.com", "melegaf@gmail.com"];
+  const isAdmin = ADMIN_EMAILS.includes(userEmail);
+  if (!isAdmin) return null;
+  const [loading, setLoading] = useState(false);
+  const [lastResult, setLastResult] = useState(null);
+
+  const handleBackup = async () => {
+    if (!onBackup) { onToast?.("⚠️ Función no disponible"); return; }
+    setLoading(true);
+    try {
+      const result = await onBackup();
+      setLastResult({ ok: true, ...result });
+      onToast?.(`✅ Backup completado — ${result.timestamp ?? new Date().toISOString().slice(0,10)}`);
+    } catch (err) {
+      setLastResult({ ok: false, error: err.message });
+      onToast?.("❌ Backup fallido: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ background:"white", borderRadius:12, border:"1px solid #e2e8f0", padding:"18px 20px" }}>
+      <div style={{ fontWeight:700, fontSize:14, color:"#1a365d", marginBottom:14, borderBottom:"2px solid #ebf8ff", paddingBottom:7 }}>
+        🗄️ Backup de datos
+      </div>
+      <div style={{ fontSize:13, color:"#718096", marginBottom:14, lineHeight:1.6 }}>
+        Los backups se guardan en Firebase Storage y se envía confirmación por email.
+        El backup automático se ejecuta todos los días a las 05:00.
+      </div>
+      {lastResult && (
+        <div style={{ padding:"10px 14px", borderRadius:8, marginBottom:12,
+          background: lastResult.ok ? "#f0fff4" : "#fff5f5",
+          border: `1px solid ${lastResult.ok ? "#9ae6b4" : "#fed7d7"}`,
+          fontSize:12, color: lastResult.ok ? "#276749" : "#c53030" }}>
+          {lastResult.ok
+            ? `✅ Último backup: ${lastResult.timestamp ?? new Date().toISOString().slice(0,10)}`
+            : `❌ Error: ${lastResult.error}`}
+        </div>
+      )}
+      <button
+        onClick={handleBackup}
+        disabled={loading}
+        style={{ padding:"10px 20px", background: loading ? "#a0aec0" : "#2b6cb0",
+          color:"white", border:"none", borderRadius:9, cursor: loading ? "not-allowed" : "pointer",
+          fontWeight:700, fontSize:13, display:"flex", alignItems:"center", gap:8 }}>
+        {loading ? "⏳ Ejecutando backup..." : "🗄️ Ejecutar backup ahora"}
+      </button>
+    </div>
+  );
+}
+
+// ── EliminarCuentaSection ─────────────────────────────────────────────────────
+function EliminarCuentaSection({ user, onToast }) {
+  const [open,      setOpen]      = useState(false);
+  const [password,  setPassword]  = useState("");
+  const [confirm,   setConfirm]   = useState("");
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState("");
+
+  const isGoogle = user?.providerData?.[0]?.providerId === "google.com";
+
+  const handleDelete = async () => {
+    if (confirm !== "ELIMINAR") { setError("Escribe ELIMINAR para confirmar"); return; }
+    setLoading(true); setError("");
+    try {
+      // Riautentica prima di eliminare
+      if (!isGoogle && password) {
+        const credential = EmailAuthProvider.credential(user.email, password);
+        await reauthenticateWithCredential(auth.currentUser, credential);
+      }
+      await deleteUser(auth.currentUser);
+      onToast?.("✅ Cuenta eliminada");
+      // Auth state change in App.jsx porterà al login
+    } catch (e) {
+      const msgs = {
+        "auth/wrong-password":        "Contraseña incorrecta",
+        "auth/requires-recent-login":  "Sesión expirada. Cierra sesión y vuelve a entrar antes de eliminar.",
+        "auth/too-many-requests":      "Demasiados intentos. Espera unos minutos.",
+      };
+      setError(msgs[e.code] || e.message);
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div style={{ background:"white", borderRadius:12, border:"2px solid #fed7d7", padding:"18px 20px" }}>
+      <div style={{ fontWeight:700, fontSize:14, color:"#c53030", marginBottom:6, borderBottom:"2px solid #fff5f5", paddingBottom:7 }}>
+        🗑️ Eliminar cuenta
+      </div>
+      <div style={{ fontSize:13, color:"#718096", marginBottom:14, lineHeight:1.6 }}>
+        Esta acción es <strong>permanente e irreversible</strong>. Se eliminará tu acceso a la app.
+        Los datos del workspace (proyectos, presupuestos) permanecerán en Firestore para los demás miembros.
+      </div>
+
+      {!open ? (
+        <button onClick={() => setOpen(true)}
+          style={{ padding:"9px 20px", background:"#fff5f5", color:"#c53030",
+            border:"1px solid #fed7d7", borderRadius:9, cursor:"pointer", fontWeight:700, fontSize:13 }}>
+          Eliminar mi cuenta →
+        </button>
+      ) : (
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          {/* Conferma password solo per email/password */}
+          {!isGoogle && (
+            <div>
+              <label style={{ fontSize:11, color:"#718096", fontWeight:700, display:"block", marginBottom:4 }}>
+                Contraseña actual
+              </label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="Tu contraseña"
+                style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #e2e8f0",
+                  borderRadius:8, fontSize:13, boxSizing:"border-box" }} />
+            </div>
+          )}
+          <div>
+            <label style={{ fontSize:11, color:"#c53030", fontWeight:700, display:"block", marginBottom:4 }}>
+              Escribe ELIMINAR para confirmar
+            </label>
+            <input value={confirm} onChange={e => setConfirm(e.target.value)}
+              placeholder="ELIMINAR"
+              style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #fed7d7",
+                borderRadius:8, fontSize:13, boxSizing:"border-box", color:"#c53030", fontWeight:700 }} />
+          </div>
+          {error && (
+            <div style={{ background:"#fff5f5", border:"1px solid #fed7d7", borderRadius:8,
+              padding:"9px 14px", fontSize:12, color:"#c53030" }}>
+              ⚠️ {error}
+            </div>
+          )}
+          <div style={{ display:"flex", gap:8 }}>
+            <button onClick={() => { setOpen(false); setError(""); setConfirm(""); setPassword(""); }}
+              style={{ padding:"9px 18px", background:"#f7fafc", border:"1px solid #e2e8f0",
+                borderRadius:9, cursor:"pointer", fontWeight:600, fontSize:13, color:"#718096" }}>
+              Cancelar
+            </button>
+            <button onClick={handleDelete}
+              disabled={loading || confirm !== "ELIMINAR"}
+              style={{ flex:1, padding:"9px", background: confirm === "ELIMINAR" ? "#c53030" : "#e2e8f0",
+                color: confirm === "ELIMINAR" ? "white" : "#a0aec0",
+                border:"none", borderRadius:9, cursor: confirm === "ELIMINAR" ? "pointer" : "not-allowed",
+                fontWeight:800, fontSize:13 }}>
+              {loading ? "Eliminando..." : "🗑️ Eliminar cuenta definitivamente"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ── ReporteButton: fetch diretto a southamerica-west1 (no App Check) ──────────
+function ReporteButton({ wsId, uid, onToast }) {
+  const [loading, setLoading] = useState(false);
+  const handleClick = async () => {
+    if (!wsId || !uid) { onToast?.("⚠️ Workspace no disponible"); return; }
+    setLoading(true);
+    try {
+      const res  = await fetch(
+        "https://southamerica-west1-obra-nova-spa.cloudfunctions.net/reporteMensualCallable",
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uid, wsId }) }
+      );
+      const json = await res.json();
+      if (json?.success) onToast?.("✅ Reporte enviado a " + json.email);
+      else onToast?.("⚠️ " + (json?.message || json?.error || "Sin actividad este mes"));
+    } catch (e) {
+      onToast?.("❌ Error: " + e.message);
+    } finally { setLoading(false); }
+  };
+  return (
+    <button onClick={handleClick} disabled={loading}
+      style={{ padding: "10px 20px", background: loading ? "#a0aec0" : "#1a365d",
+        color: "white", border: "none", borderRadius: 10,
+        cursor: loading ? "not-allowed" : "pointer",
+        fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+      {loading ? "⏳ Enviando..." : "📧 Enviar reporte de prueba ahora"}
+    </button>
+  );
+}
+
+// ── WhatsAppConfigSection — Configurazione Nova WhatsApp Business ─────────────
+function WhatsAppConfigSection({ workspace, can, members = [], onToast }) {
+  const isPro = ["pro", "empresa"].includes(workspace?.plan);
+  const isEmpresa = workspace?.plan === "empresa";
+  const wsId = workspace?.id;
+
+  // Stato locale inizializzato dal workspace
+  const existing = workspace?.waConfig || {};
+  const [enabled, setEnabled]       = useState(existing.enabled || false);
+  const [mode, setMode]             = useState(existing.autoReplyMode || "manual");
+  const [canPrices, setCanPrices]   = useState(existing.canAnswerPrices || false);
+  const [canCotiza, setCanCotiza]   = useState(existing.canGenerateCotiza || false);
+  const [canVisits, setCanVisits]   = useState(existing.canScheduleVisits || false);
+  const [greeting, setGreeting]     = useState(existing.greetingMessage || "");
+  const [timeout, setTimeout_]      = useState(existing.approvalTimeout || 300);
+  const [phones, setPhones]         = useState(existing.authorizedPhones || []);
+  const [newPhone, setNewPhone]     = useState("");
+  const [newPhoneRole, setNewPhoneRole] = useState("owner");
+  const [saving, setSaving]         = useState(false);
+  const [saved, setSaved]           = useState(false);
+
+  const addPhone = () => {
+    const clean = newPhone.trim();
+    if (!clean) return;
+    if (phones.find(p => p.phone === clean)) { onToast?.("⚠️ Número ya registrado"); return; }
+    setPhones(prev => [...prev, {
+      phone: clean,
+      role: newPhoneRole,
+      addedAt: new Date().toISOString(),
+      label: newPhoneRole === "owner" ? "Administrador" : "Operador",
+    }]);
+    setNewPhone("");
+  };
+
+  const removePhone = (idx) => setPhones(prev => prev.filter((_, i) => i !== idx));
+
+  const handleSave = async () => {
+    if (!wsId) return;
+    setSaving(true);
+    try {
+      const { doc, updateDoc } = await import("firebase/firestore");
+      const { db } = await import("../../lib/firebase");
+
+      const waConfig = {
+        enabled,
+        autoReplyMode:     mode,
+        canAnswerPrices:   canPrices,
+        canGenerateCotiza: canCotiza,
+        canScheduleVisits: canVisits,
+        greetingMessage:   greeting.trim(),
+        approvalTimeout:   parseInt(timeout) || 300,
+        authorizedPhones:  phones,
+        // Mantieni ownerPhone per compatibilità backend
+        ownerPhone:        phones.find(p => p.role === "owner")?.phone || "",
+        businessHours:     existing.businessHours || { start: 8, end: 20 },
+        updatedAt:         new Date().toISOString(),
+      };
+
+      await updateDoc(doc(db, "workspaces", wsId), { waConfig });
+      onToast?.("✅ Configuración WhatsApp guardada");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      onToast?.("⚠️ Error: " + e.message);
+    } finally { setSaving(false); }
+  };
+
+  const MODES = [
+    { id: "manual", emoji: "✋", label: "Manual", desc: "Nova sugiere, tú apruebas antes de enviar", color: "#2b6cb0", bg: "#ebf8ff" },
+    { id: "assisted", emoji: "⏱️", label: "Asistida", desc: `Nova envía en ${Math.round(timeout/60)} min si no intervienes`, color: "#b7791f", bg: "#fefcbf" },
+    { id: "express", emoji: "⚡", label: "Express", desc: "Nova responde inmediatamente (solo datos verificables)", color: "#276749", bg: "#f0fff4" },
+  ];
+
+  const inputStyle = { padding: "9px 12px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 13, color: "#1a365d", width: "100%", boxSizing: "border-box" };
+
+  if (!isPro) {
+    return (
+      <div style={{ background: "linear-gradient(135deg,#1a365d,#553c9a)", borderRadius: 14, padding: "22px 24px", color: "white" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <span style={{ fontSize: 24 }}>💬</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 16 }}>Nova por WhatsApp</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,.7)" }}>Tu asistente administrativo 24/7 por WhatsApp</div>
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,.8)", marginBottom: 14, lineHeight: 1.6 }}>
+          Tus clientes preguntan por WhatsApp y Nova responde con los datos del presupuesto.
+          Tú le escribes a Nova y ella actualiza tus proyectos sin abrir la app.
+        </div>
+        <div style={{ background: "rgba(255,255,255,.15)", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "rgba(255,255,255,.9)", fontWeight: 600 }}>
+          ⚡ Disponible en planes Pro y Empresa
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
+      <div style={{ fontWeight: 700, fontSize: 14, color: "#1a365d", marginBottom: 4, borderBottom: "2px solid #ebf8ff", paddingBottom: 7, display: "flex", alignItems: "center", gap: 8 }}>
+        💬 Nova por WhatsApp
+        {enabled && <span style={{ fontSize: 10, background: "#f0fff4", color: "#276749", padding: "2px 8px", borderRadius: 99, fontWeight: 700 }}>Activo</span>}
+      </div>
+      <div style={{ fontSize: 12, color: "#718096", marginBottom: 16, lineHeight: 1.5 }}>
+        Nova responde a tus clientes por WhatsApp y funciona como tu administrativa virtual.
+        Tú le escribes a Nova por WA y ella ejecuta acciones en tu workspace.
+      </div>
+
+      {/* Toggle principal */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: "12px 16px", background: enabled ? "#f0fff4" : "#f7fafc", borderRadius: 10, border: `1px solid ${enabled ? "#9ae6b4" : "#e2e8f0"}` }}>
+        <button onClick={() => setEnabled(!enabled)} style={{
+          width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
+          background: enabled ? "#276749" : "#cbd5e0", position: "relative", transition: "background .2s",
+        }}>
+          <div style={{
+            width: 22, height: 22, borderRadius: 11, background: "white",
+            position: "absolute", top: 2, left: enabled ? 24 : 2, transition: "left .2s",
+            boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+          }} />
+        </button>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a365d" }}>
+            {enabled ? "WhatsApp activo" : "WhatsApp desactivado"}
+          </div>
+          <div style={{ fontSize: 11, color: "#718096" }}>
+            {enabled ? "Nova está respondiendo por WhatsApp" : "Activa para que Nova gestione tus mensajes WA"}
+          </div>
+        </div>
+      </div>
+
+      {enabled && (
+        <>
+          {/* ── Números autorizados ──────────────────────────────────────── */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a365d", marginBottom: 8 }}>
+              📱 Números autorizados
+            </div>
+            <div style={{ fontSize: 11, color: "#718096", marginBottom: 10 }}>
+              Los números registrados como "Administrador" pueden dar órdenes a Nova (agregar partidas, cambiar precios, enviar mensajes).
+              Los "Operador" solo pueden consultar estado y registrar avances.
+            </div>
+
+            {/* Lista números existenti */}
+            {phones.map((p, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "#f7fafc", borderRadius: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 14 }}>{p.role === "owner" ? "👑" : "👷"}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#1a365d" }}>{p.phone}</div>
+                  <div style={{ fontSize: 10, color: "#718096" }}>{p.label || (p.role === "owner" ? "Administrador" : "Operador")}</div>
+                </div>
+                <button onClick={() => removePhone(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "#e53e3e", fontSize: 14 }}>✕</button>
+              </div>
+            ))}
+
+            {/* Aggiungi numero */}
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <input value={newPhone} onChange={e => setNewPhone(e.target.value)}
+                placeholder="+56 9 1234 5678" style={{ ...inputStyle, flex: 1 }}
+                onKeyDown={e => e.key === "Enter" && addPhone()} />
+              <select value={newPhoneRole} onChange={e => setNewPhoneRole(e.target.value)}
+                style={{ ...inputStyle, width: 140 }}>
+                <option value="owner">👑 Administrador</option>
+                <option value="operator">👷 Operador</option>
+              </select>
+              <button onClick={addPhone} style={{
+                padding: "9px 14px", background: "#1a365d", color: "white", border: "none",
+                borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 12, whiteSpace: "nowrap",
+              }}>+ Agregar</button>
+            </div>
+            {phones.length === 0 && (
+              <div style={{ fontSize: 11, color: "#e53e3e", marginTop: 6 }}>
+                ⚠️ Agrega al menos tu número para que Nova te reconozca por WhatsApp
+              </div>
+            )}
+          </div>
+
+          {/* ── Modo de respuesta (3 corsie) ────────────────────────────── */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a365d", marginBottom: 8 }}>
+              🛣️ Modo de respuesta a clientes
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {MODES.map(m => (
+                <button key={m.id} onClick={() => setMode(m.id)} style={{
+                  display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+                  borderRadius: 10, border: `2px solid ${mode === m.id ? m.color : "#e2e8f0"}`,
+                  background: mode === m.id ? m.bg : "white", cursor: "pointer", textAlign: "left",
+                  transition: "all .15s",
+                }}>
+                  <span style={{ fontSize: 20 }}>{m.emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: m.color }}>{m.label}</div>
+                    <div style={{ fontSize: 11, color: "#718096" }}>{m.desc}</div>
+                  </div>
+                  {mode === m.id && <span style={{ fontSize: 16, color: m.color }}>✓</span>}
+                </button>
+              ))}
+            </div>
+            {mode === "assisted" && (
+              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                <label style={{ fontSize: 12, color: "#4a5568", fontWeight: 600 }}>Tiempo de espera:</label>
+                <select value={timeout} onChange={e => setTimeout_(e.target.value)} style={{ ...inputStyle, width: 120 }}>
+                  <option value={120}>2 minutos</option>
+                  <option value={300}>5 minutos</option>
+                  <option value={600}>10 minutos</option>
+                  <option value={900}>15 minutos</option>
+                </select>
+              </div>
+            )}
+            {mode === "express" && (
+              <div style={{ marginTop: 8, padding: "8px 12px", background: "#fff5f5", borderRadius: 8, fontSize: 11, color: "#c53030", border: "1px solid #fed7d7" }}>
+                ⚠️ En modo Express, Nova responde inmediatamente. Solo usa datos verificables del presupuesto. Asegúrate de que tus presupuestos estén completos antes de activar.
+              </div>
+            )}
+          </div>
+
+          {/* ── Capacidades Nova ─────────────────────────────────────────── */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a365d", marginBottom: 8 }}>
+              🧠 ¿Qué puede hacer Nova con los clientes?
+            </div>
+            {[
+              { key: "prices", val: canPrices, set: setCanPrices, label: "Dar precios indicativos", desc: "Nova puede dar estimaciones de precio basadas en el mercado", emoji: "💰" },
+              { key: "cotiza", val: canCotiza, set: setCanCotiza, label: "Generar cotizaciones (/cotiza)", desc: "Nova puede crear presupuestos rápidos para nuevos clientes", emoji: "⚡" },
+              { key: "visits", val: canVisits, set: setCanVisits, label: "Agendar visitas", desc: "Nova puede proponer horarios de visita a obra", emoji: "📅" },
+            ].map(cap => (
+              <div key={cap.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#f7fafc", borderRadius: 8, marginBottom: 6 }}>
+                <button onClick={() => cap.set(!cap.val)} style={{
+                  width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
+                  background: cap.val ? "#276749" : "#cbd5e0", position: "relative", transition: "background .2s", flexShrink: 0,
+                }}>
+                  <div style={{ width: 18, height: 18, borderRadius: 9, background: "white", position: "absolute", top: 2, left: cap.val ? 20 : 2, transition: "left .2s", boxShadow: "0 1px 2px rgba(0,0,0,.2)" }} />
+                </button>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#1a365d" }}>{cap.emoji} {cap.label}</div>
+                  <div style={{ fontSize: 10, color: "#718096" }}>{cap.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Mensaje de bienvenida ─────────────────────────────────────── */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a365d", marginBottom: 6 }}>
+              👋 Mensaje de bienvenida (nuevos contactos)
+            </div>
+            <textarea value={greeting} onChange={e => setGreeting(e.target.value)}
+              placeholder={`Hola! 👋 Gracias por contactar a ${workspace?.name || "nuestra empresa"}. Tu mensaje fue recibido y te responderemos a la brevedad.`}
+              rows={3}
+              style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }} />
+            <div style={{ fontSize: 10, color: "#718096", marginTop: 4 }}>
+              Se envía automáticamente a números nuevos que no están en tus proyectos
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Botón guardar ────────────────────────────────────────────── */}
+      <button onClick={handleSave} disabled={saving}
+        style={{
+          width: "100%", padding: "12px", borderRadius: 10, border: "none", cursor: "pointer",
+          background: saved ? "#276749" : saving ? "#a0aec0" : "linear-gradient(135deg,#1a365d,#2b6cb0)",
+          color: "white", fontWeight: 700, fontSize: 14, transition: "all .2s",
+        }}>
+        {saving ? "⏳ Guardando..." : saved ? "✅ Configuración guardada" : "💾 Guardar configuración WhatsApp"}
+      </button>
+
+      {/* Info sandbox */}
+      {enabled && (
+        <div style={{ marginTop: 12, padding: "10px 14px", background: "#f7fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#1a365d", marginBottom: 4 }}>📋 Para activar WhatsApp Business:</div>
+          <div style={{ fontSize: 10, color: "#718096", lineHeight: 1.6 }}>
+            1. Configura Twilio en tu cuenta ObraNova (administración)<br/>
+            2. El webhook se configura automáticamente al activar<br/>
+            3. Para testing con sandbox: envía "join flies-total" al +14155238886 desde cada número
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TabSettings({
   workspace, members, myRole, can,
   onInvite, onChangeRole, onRemoveMember, onUpdateName, onGoToPiani,
-  user, onToast,
+  user, onToast, onBackup,
+  onRequestPush, pushPermission = "default",
+  onRestartOnboarding,
 }) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole,  setInviteRole]  = useState(ROLES.MEMBER);
@@ -551,9 +1104,76 @@ export default function TabSettings({
         )}
       </div>
 
+      {/* Push Notifications */}
+      <div style={{ background: "white", borderRadius: 12, padding: "18px 20px", boxShadow: "0 1px 4px rgba(0,0,0,.07)", marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: "#1a365d", marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+          🔔 Notificaciones push
+        </div>
+        <div style={{ fontSize: 12, color: "#718096", marginBottom: 14, lineHeight: 1.6 }}>
+          Recibe alertas en tu dispositivo cuando un cliente comenta, firma un presupuesto o hay una acción importante en tu workspace.
+        </div>
+        {pushPermission === "granted" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#f0fff4", borderRadius: 9, border: "1px solid #9ae6b4" }}>
+            <span>✅</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#276749" }}>Notificaciones activadas en este dispositivo</span>
+          </div>
+        ) : pushPermission === "denied" ? (
+          <div style={{ padding: "10px 14px", background: "#fff5f5", borderRadius: 9, border: "1px solid #feb2b2", fontSize: 12, color: "#c53030" }}>
+            ⚠️ Las notificaciones están bloqueadas en este navegador. Para activarlas, ve a la configuración del sitio en tu navegador y permite las notificaciones para app.obranova.cl.
+          </div>
+        ) : (
+          <button
+            onClick={async () => {
+              const result = await onRequestPush?.();
+              if (result === "granted") onToast?.("🔔 Notificaciones activadas");
+              else if (result === "denied") onToast?.("⚠️ Permiso denegado — actívalas desde el navegador");
+            }}
+            style={{ padding: "10px 22px", background: "#1a365d", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}
+          >
+            🔔 Activar notificaciones push
+          </button>
+        )}
+      </div>
+
+      {/* Reporte Mensual */}
+      <div style={{ background: "white", borderRadius: 12, padding: "18px 20px", boxShadow: "0 1px 4px rgba(0,0,0,.07)", marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: "#1a365d", marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+          📈 Reporte mensual automático
+        </div>
+        <div style={{ fontSize: 12, color: "#718096", marginBottom: 14, lineHeight: 1.6 }}>
+          El 1° de cada mes recibirás un email con los KPIs del mes anterior: facturación, margen, tasa de conversión y proyectos. Solo para planes Pro y Empresa.
+        </div>
+        <ReporteButton wsId={workspace?.id} uid={user?.uid} onToast={onToast} />
+      </div>
+
+      {/* Backup */}
+      <BackupSection onBackup={onBackup} onToast={onToast} can={can} userEmail={user?.email} />
+
+      {/* ═══ WhatsApp Business — Nova por WhatsApp ═══════════════════════ */}
+      <WhatsAppConfigSection workspace={workspace} can={can} members={members} onToast={onToast} />
+
+      {/* ── Scadenzario reminder ── */}
+      <ScadenzarioSection workspace={workspace} can={can} onToast={onToast} />
+
       {/* 4.6 Referral */}
       <ReferralCard workspace={workspace} userEmail={user?.email} onToast={onToast} />
 
+      {/* ── Eliminar cuenta ── */}
+      <EliminarCuentaSection user={user} onToast={onToast} />
+
+
+      {/* ── Reiniciar onboarding ──────────────────────────────────────── */}
+      {onRestartOnboarding && (
+        <div style={{ marginTop: 24, background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#1a365d", marginBottom: 2 }}>🧭 Guía de inicio</div>
+            <div style={{ fontSize: 12, color: "#718096" }}>Vuelve a ver el asistente de configuración inicial</div>
+          </div>
+          <button onClick={onRestartOnboarding} style={{ padding: "8px 16px", background: "#EBF5FB", color: "#2b6cb0", border: "1px solid #bee3f8", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            Reiniciar →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

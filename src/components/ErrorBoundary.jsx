@@ -1,10 +1,11 @@
 // ─── components/ErrorBoundary.jsx ───────────────────────────────────────────
 // Cattura errori nei tab figli e mostra un messaggio leggibile
 // invece di far crashare tutta l'app.
-// Nota: Sentry.captureException commentato — riattivare dopo fix TDZ Vite 5.
+// Fix TDZ Vite 5: NON importare @sentry/react con static import —
+// si usa import() dinamico dentro componentDidCatch per evitare il
+// circular-init che causava il crash. Sentry è già inizializzato in main.jsx.
 
 import { Component } from "react";
-// import * as Sentry from "@sentry/react";  // ← DISABILITATO: causa TDZ crash con Vite 5
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -17,7 +18,13 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // Sentry.captureException(error, { extra: info });  // ← riattivare con Sentry fix
+    // Import dinamico: evita TDZ crash di Vite 5 con static import in class component.
+    // Sentry è già inizializzato in main.jsx — qui lo usiamo solo per reportare.
+    import("@sentry/react")
+      .then(({ captureException }) => {
+        captureException(error, { extra: info });
+      })
+      .catch(() => {}); // silenzioso se offline o bloccato da adblocker
     console.error("Tab error:", error, info);
   }
 

@@ -4,9 +4,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Stage, Layer, Rect, Text, Transformer, Line, Circle, Group, Shape } from "react-konva";
-import { httpsCallable } from "firebase/functions";
+import { httpsCallable, getFunctions } from "firebase/functions";
 import { collection, query, orderBy, getDocs } from "firebase/firestore";
-import { db, functions } from "../../lib/firebase";
+import { db, app } from "../../lib/firebase";
 
 // ── Palette colori stanze ─────────────────────────────────────────────────────
 const ROOM_TYPES = [
@@ -509,7 +509,7 @@ export default function TabDiseno({ workspaceId, proyectoId, proyectoNombre, onT
 
     try {
       setRenderStep("Preparando datos...");
-      const fns      = functions;
+      const fns      = getFunctions(app, "southamerica-west1");
       const renderAI = httpsCallable(fns, "renderAI");
 
       // Filtra stanze: selezionata o tutte
@@ -680,7 +680,7 @@ export default function TabDiseno({ workspaceId, proyectoId, proyectoNombre, onT
 
     try {
       setStandaloneStep("Preparando render...");
-      const fns      = functions;
+      const fns      = getFunctions(app, "southamerica-west1");
       const renderAI = httpsCallable(fns, "renderAI");
 
       // Manda una stanza virtuale generica se non c'è plano

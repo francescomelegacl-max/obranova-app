@@ -1,3 +1,4 @@
+import './index.css'
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
@@ -13,6 +14,44 @@ Sentry.init({
     "ResizeObserver loop limit exceeded",
   ],
 });
+
+// ── Global error tracker per Debug Panel admin ──────────────────────────────
+window.__ON_ERROR_LOG = [];
+const pushErr = (type, message, source) => {
+  window.__ON_ERROR_LOG.push({
+    type, message: String(message).slice(0, 500),
+    source: source ? String(source).slice(0, 200) : "",
+    time: new Date().toLocaleTimeString("es-CL"),
+  });
+  // Tieni max 200 errori
+  if (window.__ON_ERROR_LOG.length > 200) window.__ON_ERROR_LOG.shift();
+};
+window.addEventListener("error", (e) => {
+  pushErr("JS Error", e.message || e.error?.message || "Unknown", e.filename ? `${e.filename}:${e.lineno}` : "");
+});
+window.addEventListener("unhandledrejection", (e) => {
+  pushErr("Promise", e.reason?.message || e.reason || "Unhandled rejection", e.reason?.stack?.split("\n")[1]?.trim() || "");
+});
+// Intercetta fetch errors (CF 4xx/5xx)
+const _fetch = window.fetch;
+window.fetch = async (...args) => {
+  try {
+    const res = await _fetch(...args);
+    if (!res.ok && res.status >= 400) {
+      const url = typeof args[0] === "string" ? args[0] : args[0]?.url || "";
+      // Solo per Cloud Functions
+      if (url.includes("cloudfunctions.net") || url.includes("run.app")) {
+        let body = "";
+        try { body = await res.clone().text(); body = body.slice(0, 300); } catch {}
+        pushErr(`CF ${res.status}`, body || res.statusText, url.split("?")[0].split("/").pop());
+      }
+    }
+    return res;
+  } catch (err) {
+    pushErr("Fetch", err.message, typeof args[0] === "string" ? args[0].split("?")[0] : "");
+    throw err;
+  }
+};
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -46,3 +85,4 @@ createRoot(document.getElementById("root")).render(
     </Sentry.ErrorBoundary>
   </StrictMode>
 );
+

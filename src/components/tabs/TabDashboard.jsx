@@ -1,5 +1,5 @@
 // ─── components/tabs/TabDashboard.jsx ───────────────────────────────────────
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid,
@@ -69,9 +69,20 @@ function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, value, name }) {
   );
 }
 
-export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProject, onNewProject, plan, proyectosRestantes, onUpgrade, itemsInAlert = [], currentId }) {
+export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProject, onNewProject, plan, proyectosRestantes, onUpgrade, itemsInAlert = [], currentId, isMobile, wizardProyectos = [], wizardLink }) {
 
   const [activeSlice, setActiveSlice] = useState(null);
+  const [chartsOpen, setChartsOpen] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 360px)").matches : false
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 360px)");
+    const handler = (e) => setIsNarrow(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   // ── Stats base ────────────────────────────────────────────────────────────
   const dashStats = useMemo(() => {
@@ -94,8 +105,9 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
     };
   }, [proyectos]);
 
-  const convRate = dashStats.total > 0
-    ? Math.round(dashStats.aceptados / dashStats.total * 100) : 0;
+  // convRate: aceptados / enviados (esclude borradores — dato reale di conversione)
+  const convRate = dashStats.enviados > 0
+    ? Math.round(dashStats.aceptados / dashStats.enviados * 100) : 0;
 
   // ── Revenue mensile (recharts) ────────────────────────────────────────────
   const revenueData = useMemo(() => {
@@ -119,28 +131,31 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
       }));
   }, [proyectos]);
 
-  // ── Pie chart stati ───────────────────────────────────────────────────────
-  const STATI_CONFIG = [
-    { key: "Aceptado",  color: "#48bb78", label: t.aceptados  || "Aceptado" },
-    { key: "Enviado",   color: "#63b3ed", label: t.enviados   || "Enviado" },
-    { key: "Borrador",  color: "#cbd5e0", label: t.borradores || "Borrador" },
-    { key: "Rechazado", color: "#fc8181", label: t.rechazados || "Rechazado" },
-    { key: "Activo",    color: "#f6ad55", label: t.activo     || "Activo" },
-    { key: "Pausado",   color: "#b794f4", label: t.pausado    || "Pausado" },
-    { key: "Finalizado",color: "#68d391", label: t.finalizado || "Finalizado" },
-  ];
-
+  // ── Pie chart stati — STATI_CONFIG dentro useMemo, singolo reduce ────────
   const pieData = useMemo(() => {
+    const stati = [
+      { key: "Aceptado",   color: "#48bb78", label: t.aceptados  || "Aceptado"   },
+      { key: "Enviado",    color: "#63b3ed", label: t.enviados   || "Enviado"    },
+      { key: "Borrador",   color: "#cbd5e0", label: t.borradores || "Borrador"   },
+      { key: "Rechazado",  color: "#fc8181", label: t.rechazados || "Rechazado"  },
+      { key: "Activo",     color: "#f6ad55", label: t.activo     || "Activo"     },
+      { key: "Pausado",    color: "#b794f4", label: t.pausado    || "Pausado"    },
+      { key: "Finalizado", color: "#68d391", label: t.finalizado || "Finalizado" },
+    ];
     const total = proyectos.length || 1;
-    return STATI_CONFIG
+    const counts = proyectos.reduce((acc, p) => {
+      acc[p.estado] = (acc[p.estado] || 0) + 1;
+      return acc;
+    }, {});
+    return stati
       .map(s => ({
         name:  s.label,
-        value: proyectos.filter(p => p.estado === s.key).length,
+        value: counts[s.key] || 0,
         color: s.color,
-        pct:   Math.round(proyectos.filter(p => p.estado === s.key).length / total * 100),
+        pct:   Math.round((counts[s.key] || 0) / total * 100),
       }))
       .filter(d => d.value > 0);
-  }, [proyectos]);
+  }, [proyectos, t]);
 
   // ── Top clientes ──────────────────────────────────────────────────────────
   const topClientes = useMemo(() => Object.values(
@@ -177,7 +192,7 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
   ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? 10 : 14, padding: isMobile ? "10px 10px 0" : "0", boxSizing: "border-box", overflowX: "hidden", width: "100%" }}>
 
       {/* 4.1 Banner piano Free */}
       {plan === "free" && (
@@ -235,7 +250,7 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
           </button>
         </div>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "repeat(2,1fr)", gap: isMobile ? 8 : 10, width: "100%", boxSizing: "border-box" }}>
 
         {/* 2.5 Continuar donde dejaste */}
         {currentId && (() => { const last = proyectos.find(p => p.id === currentId); return last ? (
@@ -270,14 +285,109 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
         )}
 
 
+        {/* ── Wizard badge: solicitudes de clientes ── */}
+        {wizardProyectos && wizardProyectos.length > 0 && (
+          <div style={{
+            gridColumn: "1 / -1",
+            background: "linear-gradient(135deg,#f0fff4,#e9d8fd)",
+            border: "1px solid #9ae6b4", borderRadius: 12,
+            padding: isMobile ? "12px" : "14px 16px",
+            boxSizing: "border-box", width: "100%",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 18 }}>📬</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#276749" }}>
+                    {wizardProyectos.length} solicitud{wizardProyectos.length > 1 ? "es" : ""} de clientes
+                  </div>
+                  <div style={{ fontSize: 11, color: "#4a5568" }}>Formulario público</div>
+                </div>
+              </div>
+              {wizardLink && (
+                <a href={wizardLink} target="_blank" rel="noreferrer"
+                  style={{ fontSize: 11, fontWeight: 700, color: "#276749", background: "#c6f6d5", padding: "5px 10px", borderRadius: 8, textDecoration: "none", whiteSpace: "nowrap" }}>
+                  🔗 Compartir
+                </a>
+              )}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {wizardProyectos.slice(0, isMobile ? 3 : 4).map(p => (
+                <div key={p.id}
+                  onClick={() => onOpenProject?.(p)}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    background: "white", borderRadius: 8, padding: isMobile ? "8px 10px" : "9px 12px",
+                    cursor: "pointer", border: "1px solid #c6f6d5",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#f0fff4"}
+                  onMouseLeave={e => e.currentTarget.style.background = "white"}
+                >
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1a365d", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.info?.cliente || p.info?.nombre || "Cliente sin nombre"}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#718096", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.info?.descripcion || "Sin descripción"} · {(p.createdAt || "").slice(0, 10)}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#276749", background: "#c6f6d5", padding: "3px 9px", borderRadius: 99, flexShrink: 0, marginLeft: 8 }}>
+                    Abrir →
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Portfolio AI — banner promozionale */}
+        {plan?.isPro && wizardLink && (
+          <div
+            onClick={() => {
+              const wsId = wizardLink.split("/presupuesto/")[1];
+              if (wsId) window.open(`${window.location.origin}/portfolio/${wsId}`, "_blank");
+            }}
+            style={{
+              background: "linear-gradient(135deg, #1a365d, #553c9a)",
+              borderRadius: 12, padding: "14px 18px", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 14,
+              gridColumn: isNarrow ? "1" : "1 / -1",
+              transition: "transform .15s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = "scale(1.01)"}
+            onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+          >
+            <span style={{ fontSize: 28, flexShrink: 0 }}>🎨</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800, fontSize: 14, color: "white", marginBottom: 2 }}>
+                Tu Portfolio AI está activo
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)" }}>
+                Tus renders se publican automáticamente. Compártelo en redes sociales para atraer clientes.
+              </div>
+            </div>
+            <div style={{ padding: "6px 14px", background: "rgba(255,255,255,0.15)", borderRadius: 8, color: "white", fontWeight: 700, fontSize: 11, whiteSpace: "nowrap" }}>
+              Ver →
+            </div>
+          </div>
+        )}
+
         {kpis.map(k => (
           <div key={k.label} style={{
             background: k.bg, border: `1px solid ${k.color}22`,
-            borderRadius: 12, padding: "14px 16px",
+            borderRadius: isMobile ? 10 : 12,
+            padding: isMobile ? "10px 12px" : "14px 16px",
+            minWidth: 0, boxSizing: "border-box", overflow: "hidden",
+            display: isMobile ? "flex" : "block",
+            alignItems: isMobile ? "center" : undefined,
+            gap: isMobile ? 10 : undefined,
+            minHeight: isMobile ? 0 : undefined,
           }}>
-            <div style={{ fontSize: 20, marginBottom: 3 }}>{k.icon}</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.value}</div>
-            <div style={{ fontSize: 11, color: "#718096" }}>{k.label}</div>
+            <div style={{ fontSize: isMobile ? 22 : 20, flexShrink: 0, marginBottom: isMobile ? 0 : 3 }}>{k.icon}</div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: isMobile ? 17 : 18, fontWeight: 800, color: k.color, lineHeight: 1.1 }}>{k.value}</div>
+              <div style={{ fontSize: isMobile ? 10 : 11, color: "#718096", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.label}</div>
+            </div>
           </div>
         ))}
       </div>
@@ -285,7 +395,7 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
       {/* Panel Financiero */}
       <div style={{ background: "linear-gradient(135deg,#1a365d,#2d3748)", borderRadius: 12, padding: "18px 20px", color: "white" }}>
         <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 14 }}>📊 Panel Financiero</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isNarrow ? "1fr" : "repeat(2,1fr)", gap: isMobile ? 8 : 12 }}>
           {[
             { label: "Facturación aceptada", value: fmt(dashStats.facturacion), icon: "💰", color: "#68d391" },
             { label: "Costo real",           value: fmt(dashStats.costoReal),   icon: "🔧", color: "#fc8181" },
@@ -302,6 +412,17 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
       </div>
 
       {/* ── GRAFICI RECHARTS ────────────────────────────────────────────────── */}
+      {isMobile && (
+        <button onClick={() => setChartsOpen(v => !v)} style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "11px 14px", background: "white", border: "1px solid #e2e8f0",
+          borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700, color: "#1a365d",
+        }}>
+          <span>📊 Ver gráficos y análisis</span>
+          <span style={{ transition: "transform .2s", transform: chartsOpen ? "rotate(180deg)" : "none", fontSize: 10 }}>▼</span>
+        </button>
+      )}
+      {(!isMobile || chartsOpen) && (
       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
 
         {/* Revenue mensile — LineChart + BarChart */}
@@ -493,6 +614,7 @@ export default function TabDashboard({ proyectos, partidas, cats, t, onOpenProje
         </div>
 
       </div>
+      )}
     </div>
   );
 }

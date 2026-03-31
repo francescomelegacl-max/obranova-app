@@ -1,23 +1,16 @@
 // ─── hooks/useWorkspace.js ───────────────────────────────────────────────────
-// Gestisce workspace (aziende), membri e ruoli.
-// Struttura Firestore:
-//   workspaces/{workspaceId}/
-//     name, ownerId, createdAt
-//     members/{uid} → { role, email, displayName, joinedAt }
-
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
-  doc, setDoc, getDoc, collection, collectionGroup, getDocs,
-  deleteDoc, updateDoc, query, where
+  doc, setDoc, getDoc, collection, getDocs,
+  deleteDoc, updateDoc, query, where, onSnapshot
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
-import { handleError } from "../utils/errorHandler";
 
 export const ROLES = {
-  OWNER:  "owner",   // titolare — accesso totale
-  ADMIN:  "admin",   // responsabile — tutto tranne eliminare workspace
-  MEMBER: "member",  // operaio/collaboratore — solo progetti assegnati
-  VIEWER: "viewer",  // cliente/esterno — solo visualizzazione
+  OWNER:  "owner",
+  ADMIN:  "admin",
+  MEMBER: "member",
+  VIEWER: "viewer",
 };
 
 export const ROLE_LABELS = {
@@ -35,54 +28,111 @@ export const ROLE_COLORS = {
 };
 
 export function useWorkspace({ onToast }) {
-  const [workspace,     setWorkspace]     = useState(null);   // workspace attivo
-  const [workspaces,    setWorkspaces]    = useState([]);     // tutti i workspace dell'utente
-  const [members,       setMembers]       = useState([]);     // membri del workspace attivo
-  const [myRole,        setMyRole]        = useState(null);   // ruolo dell'utente corrente
-  const [loadingWS,     setLoadingWS]     = useState(true);
+  const [workspace,  setWorkspace]  = useState(null);
+  const [workspaces, setWorkspaces] = useState([]);
+  const [members,    setMembers]    = useState([]);
+  const [myRole,     setMyRole]     = useState(null);
+  const [loadingWS,  setLoadingWS]  = useState(true);
 
-  const uid = () => auth.currentUser?.uid;
+  const uid       = () => auth.currentUser?.uid;
   const userEmail = () => auth.currentUser?.email;
 
-  // ── Carica tutti i workspace a cui appartiene l'utente ────────────────────
-  // Approccio semplice: query workspaces dove ownerId == uid
+  // Ref per unsubscribe del listener workspace attivo
+  const wsUnsubRef = useRef(null);
+
+  // ── Carica workspace utente ───────────────────────────────────────────────
+  // Approccio diretto: legge workspace dove ownerId == uid (no collectionGroup)
+  // + workspace dove l'utente è membro tramite documento member diretto
   const loadWorkspaces = useCallback(async () => {
     const u = uid(); if (!u) return [];
     setLoadingWS(true);
     try {
       const list = [];
-      // Query workspace dove l'utente è owner
+      const seen = new Set();
+
+      // 1. Workspace dove l'utente è owner
       const ownerQ = query(collection(db, "workspaces"), where("ownerId", "==", u));
       const ownerSnap = await getDocs(ownerQ);
       for (const wsDoc of ownerSnap.docs) {
-        list.push({ id: wsDoc.id, ...wsDoc.data(), myRole: "owner" });
+        if (!seen.has(wsDoc.id)) {
+          seen.add(wsDoc.id);
+          list.push({ id: wsDoc.id, ...wsDoc.data(), myRole: "owner" });
+        }
       }
+
+      // 2. Workspace dove l'utente è membro (via inviti accettati)
+      // Legge gli inviti accettati per trovare workspaceId aggiuntivi
+      const inviteQ = query(
+        collection(db, "invites"),
+        where("invitedEmail", "==", userEmail()?.toLowerCase() || ""),
+        where("status", "==", "accepted")
+      );
+      const inviteSnap = await getDocs(inviteQ);
+      for (const invDoc of inviteSnap.docs) {
+        const wsId = invDoc.data().workspaceId;
+        if (wsId && !seen.has(wsId)) {
+          seen.add(wsId);
+          const wsDoc = await getDoc(doc(db, "workspaces", wsId));
+          if (wsDoc.exists()) {
+            // Legge il ruolo dal documento member
+            const memberDoc = await getDoc(doc(db, "workspaces", wsId, "members", u));
+            const role = memberDoc.exists() ? memberDoc.data().role : invDoc.data().role;
+            list.push({ id: wsId, ...wsDoc.data(), myRole: role });
+          }
+        }
+      }
+
       setWorkspaces(list);
       return list;
     } catch (e) {
-      return handleError(e, { context: "loadWorkspaces", fallback: [] });
+      console.error("loadWorkspaces:", e);
+      return [];
     } finally {
       setLoadingWS(false);
     }
   }, []);
 
   // ── Seleziona workspace attivo ────────────────────────────────────────────
-  const selectWorkspace = useCallback(async (ws) => {
+  // Apre un listener onSnapshot sul documento workspace — il piano e tutti
+  // i campi si aggiornano in real-time senza bisogno di reload.
+  const selectWorkspace = useCallback((ws) => {
     const u = uid(); if (!u) return;
-    setWorkspace(ws);
+
+    // Chiude il listener precedente se esiste
+    if (wsUnsubRef.current) { wsUnsubRef.current(); wsUnsubRef.current = null; }
+
+    // Imposta subito il workspace e il ruolo per non bloccare la UI
+    setWorkspace({ ...ws });
     setMyRole(ws.myRole);
-    // Carica membri
-    try {
-      const snap = await getDocs(collection(db, "workspaces", ws.id, "members"));
-      const list = [];
-      snap.forEach(d => list.push({ uid: d.id, ...d.data() }));
-      setMembers(list);
-    } catch (e) {
-      handleError(e, { context: "loadMembers" });
-    }
+
+    // Listener real-time sul documento workspace
+    const unsub = onSnapshot(
+      doc(db, "workspaces", ws.id),
+      (snap) => {
+        if (snap.exists()) {
+          setWorkspace(prev => ({ ...prev, ...snap.data(), id: snap.id, myRole: prev?.myRole ?? ws.myRole }));
+        }
+      },
+      (e) => console.error("onSnapshot workspace:", e)
+    );
+    wsUnsubRef.current = unsub;
+
+    // Carica i membri (one-shot, non serve real-time)
+    getDocs(collection(db, "workspaces", ws.id, "members"))
+      .then(snap => {
+        const list = [];
+        snap.forEach(d => list.push({ uid: d.id, ...d.data() }));
+        setMembers(list);
+      })
+      .catch(e => console.error("loadMembers:", e));
   }, []);
 
-  // ── Crea nuovo workspace ──────────────────────────────────────────────────
+  // ── Cleanup listener quando il componente smonta ──────────────────────────
+  useEffect(() => {
+    return () => { if (wsUnsubRef.current) wsUnsubRef.current(); };
+  }, []);
+
+  // ── Crea workspace ────────────────────────────────────────────────────────
   const createWorkspace = useCallback(async (name) => {
     const u = uid(); if (!u) return null;
     if (!name?.trim()) { onToast("❌ Inserisci un nome per l'azienda"); return null; }
@@ -96,13 +146,12 @@ export function useWorkspace({ onToast }) {
         ownerEmail: userEmail() || "",
         createdAt: new Date().toISOString(),
         plan: "free",
-        // 4.5 Trial Pro 14gg automatico alla creazione
         trialEndsAt: trialEnd.toISOString(),
       };
       await setDoc(ref, wsData);
-      // Aggiunge il creatore come owner — FIX 1.3: include campo uid per query collectionGroup
       await setDoc(doc(db, "workspaces", ref.id, "members", u), {
-        uid: u,
+        uid:         u,
+        workspaceId: ref.id,
         role:        ROLES.OWNER,
         email:       userEmail() || "",
         displayName: auth.currentUser?.displayName || userEmail() || "Titolare",
@@ -111,38 +160,40 @@ export function useWorkspace({ onToast }) {
       onToast("✅ Azienda creata!");
       return { id: ref.id, ...wsData, myRole: ROLES.OWNER };
     } catch (e) {
-      return handleError(e, { context: "createWorkspace", onToast, fallback: null });
+      console.error("createWorkspace:", e);
+      onToast("❌ Errore nella creazione: " + e.message);
+      return null;
     }
   }, [onToast]);
 
-  // ── Invita membro (crea un invito pendente) ───────────────────────────────
+  // ── Invita membro ─────────────────────────────────────────────────────────
   const inviteMember = useCallback(async (email, role, workspaceId) => {
     const u = uid(); if (!u) return false;
     if (!email?.trim()) { onToast("❌ Inserisci un'email"); return false; }
     const wsId = workspaceId || workspace?.id;
     if (!wsId) return false;
     try {
-      // Salva invito pendente — l'utente lo vedrà al login
       const inviteRef = doc(collection(db, "invites"));
       await setDoc(inviteRef, {
-        workspaceId: wsId,
-        workspaceName: workspace?.name || "",
-        invitedEmail: email.trim().toLowerCase(),
+        workspaceId:    wsId,
+        workspaceName:  workspace?.name || "",
+        invitedEmail:   email.trim().toLowerCase(),
         role,
-        invitedBy: u,
+        invitedBy:      u,
         invitedByEmail: userEmail() || "",
-        createdAt: new Date().toISOString(),
-        status: "pending", // pending | accepted | rejected
+        createdAt:      new Date().toISOString(),
+        status:         "pending",
       });
       onToast(`✅ Invito inviato a ${email}`);
       return true;
     } catch (e) {
-      return handleError(e, { context: "inviteMember", onToast, fallback: false });
+      console.error("inviteMember:", e);
+      onToast("❌ Errore: " + e.message);
+      return false;
     }
   }, [workspace, onToast]);
 
-  // ── Carica inviti pendenti per l'utente corrente ──────────────────────────
-  // FIX 1.2: usa query con where() invece di getDocs globale su tutta la collection
+  // ── Inviti pendenti ───────────────────────────────────────────────────────
   const loadPendingInvites = useCallback(async () => {
     const email = userEmail()?.toLowerCase();
     if (!email) return [];
@@ -157,7 +208,8 @@ export function useWorkspace({ onToast }) {
       snap.forEach(d => list.push({ id: d.id, ...d.data() }));
       return list;
     } catch (e) {
-      return handleError(e, { context: "loadPendingInvites", fallback: [] });
+      console.error("loadPendingInvites:", e);
+      return [];
     }
   }, []);
 
@@ -165,20 +217,21 @@ export function useWorkspace({ onToast }) {
   const acceptInvite = useCallback(async (invite) => {
     const u = uid(); if (!u) return false;
     try {
-      // Aggiunge l'utente come membro del workspace — FIX 1.3: include campo uid per query collectionGroup
       await setDoc(doc(db, "workspaces", invite.workspaceId, "members", u), {
-        uid: u,
+        uid:         u,
+        workspaceId: invite.workspaceId,
         role:        invite.role,
         email:       userEmail() || "",
         displayName: auth.currentUser?.displayName || userEmail() || "",
         joinedAt:    new Date().toISOString(),
       });
-      // Aggiorna stato invito
       await updateDoc(doc(db, "invites", invite.id), { status: "accepted" });
       onToast(`✅ Sei entrato in ${invite.workspaceName}`);
       return true;
     } catch (e) {
-      return handleError(e, { context: "acceptInvite", onToast, fallback: false });
+      console.error("acceptInvite:", e);
+      onToast("❌ Errore: " + e.message);
+      return false;
     }
   }, [onToast]);
 
@@ -188,11 +241,12 @@ export function useWorkspace({ onToast }) {
       await updateDoc(doc(db, "invites", inviteId), { status: "rejected" });
       return true;
     } catch (e) {
-      return handleError(e, { context: "rejectInvite", fallback: false });
+      console.error("rejectInvite:", e);
+      return false;
     }
   }, []);
 
-  // ── Cambia ruolo membro ───────────────────────────────────────────────────
+  // ── Cambia ruolo ──────────────────────────────────────────────────────────
   const changeMemberRole = useCallback(async (memberUid, newRole) => {
     const wsId = workspace?.id; if (!wsId) return;
     try {
@@ -229,17 +283,17 @@ export function useWorkspace({ onToast }) {
     }
   }, [workspace, onToast]);
 
-  // ── Permessi helper ───────────────────────────────────────────────────────
+  // ── Permessi ──────────────────────────────────────────────────────────────
   const can = useCallback((action) => {
     switch (action) {
-      case "create_project":  return ["owner","admin","member"].includes(myRole);
-      case "delete_project":  return ["owner","admin"].includes(myRole);
-      case "edit_costs":      return ["owner","admin","member"].includes(myRole);
-      case "see_costs":       return ["owner","admin"].includes(myRole);
-      case "invite_members":  return ["owner","admin"].includes(myRole);
-      case "manage_members":  return myRole === "owner";
-      case "see_all_projects":return ["owner","admin"].includes(myRole);
-      case "manage_workspace":return myRole === "owner";
+      case "create_project":   return ["owner","admin","member"].includes(myRole);
+      case "delete_project":   return ["owner","admin"].includes(myRole);
+      case "edit_costs":       return ["owner","admin","member"].includes(myRole);
+      case "see_costs":        return ["owner","admin"].includes(myRole);
+      case "invite_members":   return ["owner","admin"].includes(myRole);
+      case "manage_members":   return myRole === "owner";
+      case "see_all_projects": return ["owner","admin"].includes(myRole);
+      case "manage_workspace": return myRole === "owner";
       default: return false;
     }
   }, [myRole]);

@@ -29,10 +29,11 @@ export const fmtPct = (n) =>
 export const todayStr = () => new Date().toISOString().slice(0, 10);
 
 /**
- * Calcola tutti i totali finanziari a partire da partidas e pct.
- * Restituisce un oggetto con cd, ci, gf, imprevistos, sub, util, total, iva, totalIva.
+ * Calcola tutti i totali finanziari a partire da partidas, pct e descuento.
+ * Restituisce un oggetto con cd, ci, gf, imprevistos, sub, util, total,
+ * descuentoAmt, totalConDesc, iva, totalIva.
  */
-export const calcTotals = (partidas, pct) => {
+export const calcTotals = (partidas, pct, descuento) => {
   const cd      = partidas.reduce((s, p) => s + p.cant * p.pu, 0);
   const ci      = cd * (pct.ci / 100);
   const gf      = cd * (pct.gf / 100);
@@ -40,9 +41,15 @@ export const calcTotals = (partidas, pct) => {
   const sub     = cd + ci + gf + imprev;
   const util    = sub * (pct.utilidad / 100);
   const total   = sub + util;
-  const ivaAmt  = total * 0.19;
-  const totalIva = total + ivaAmt;
-  return { cd, ci, gf, imprevistos: imprev, sub, util, total, iva: ivaAmt, totalIva };
+  // Descuento — calcolato sul netto (total s/IVA), non sul totale con IVA
+  const desc    = descuento || { tipo: "pct", valor: 0 };
+  const descuentoAmt = desc.tipo === "pct"
+    ? sub * ((desc.valor || 0) / 100)
+    : (desc.valor || 0);
+  const totalConDesc = total - descuentoAmt;
+  const ivaAmt  = totalConDesc * 0.19;
+  const totalIva = totalConDesc + ivaAmt;
+  return { cd, ci, gf, imprevistos: imprev, sub, util, total, descuentoAmt, totalConDesc, iva: ivaAmt, totalIva };
 };
 
 /**

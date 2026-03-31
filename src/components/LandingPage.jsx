@@ -25,19 +25,21 @@ const COLORS = {
 
 // ── Features principali ───────────────────────────────────────────────────────
 const FEATURES = [
-  { icon: "📋", title: "Presupuestos en minutos", desc: "Crea presupuestos profesionales con partidas, categorías y totales automáticos. Envía PDF al cliente en un clic." },
-  { icon: "✍️", title: "Firma digital del cliente", desc: "El cliente firma desde su celular sin instalar nada. El estado del proyecto se actualiza automáticamente." },
-  { icon: "📊", title: "Control de costos real", desc: "Visualiza márgenes, gastos e imprevistos en tiempo real. Export a Excel con un clic." },
-  { icon: "🏗️", title: "Gestión de obra completa", desc: "Proyectos, bodega, agenda y facturas en un solo lugar. Trabaja desde el celular en la obra." },
-  { icon: "💬", title: "WhatsApp integrado", desc: "Notifica al cliente el estado del proyecto con mensajes predefinidos. Sin copiar y pegar." },
-  { icon: "👥", title: "Trabajo en equipo", desc: "Invita a tu equipo con roles diferenciados. Cada uno ve solo lo que necesita." },
+  { icon: "🤖", title: "Nova AI genera tu presupuesto", desc: "Escribe /genera cocina 12m² y Nova crea partidas con precios reales de mercado chileno 2026. O usa /cotiza para responder al cliente en 30 segundos." },
+  { icon: "✍️", title: "Firma digital en segundos", desc: "El cliente recibe un link, abre desde el celular y firma. Tú recibes notificación inmediata. Sin imprimir, sin escanear." },
+  { icon: "💳", title: "Cobro integrado con MercadoPago", desc: "El QR de pago va directo en el PDF del presupuesto. El cliente paga, el sistema actualiza el estado automáticamente." },
+  { icon: "📊", title: "Márgenes y benchmarks en tiempo real", desc: "CI, gastos fijos, imprevistos y utilidad calculados al instante. Nova compara tus precios con el mercado y te avisa si estás bajo." },
+  { icon: "🎨", title: "Render AI fotorealístico", desc: "Describe materiales, colores y estilo — la AI genera la imagen del proyecto terminado. Incluye Before/After para WhatsApp." },
+  { icon: "🌐", title: "Portal del cliente con Nova AI", desc: "Tu cliente tiene su portal con presupuesto, renders, preguntas frecuentes contestadas por Nova, firma y pagos." },
+  { icon: "⚡", title: "/cotiza — respuesta express", desc: "Te llaman preguntando cuánto cuesta un baño. Escribes /cotiza baño 6m² y en 30 segundos tienes el presupuesto listo para enviar." },
+  { icon: "🤝", title: "CRM + Planificación integrados", desc: "Pipeline Kanban de clientes, tareas de obra con asignación, agenda con hitos. Todo en un solo lugar, sin apps externas." },
 ];
 
 // ── Testimonios ───────────────────────────────────────────────────────────────
 const TESTIMONIOS = [
-  { nombre: "Carlos M.", empresa: "Construcciones del Norte", texto: "Antes perdía 2 horas por presupuesto. Ahora en 20 minutos lo tengo listo y enviado al cliente.", stars: 5 },
-  { nombre: "Ana L.", empresa: "Remodelaciones AL", texto: "La firma digital fue un cambio total. Los clientes firman al momento, sin imprimir nada.", stars: 5 },
-  { nombre: "Roberto P.", empresa: "RP Obras", texto: "Llevo el control de 8 obras al mismo tiempo desde el celular. Imposible antes.", stars: 5 },
+  { nombre: "Carlos M.", empresa: "Construcciones del Norte, Coquimbo", texto: "Antes me tomaba 2 horas hacer un presupuesto en Excel. Ahora en 15 minutos lo tengo listo y enviado con PDF profesional.", stars: 5 },
+  { nombre: "Ana L.", empresa: "Remodelaciones AL, La Serena", texto: "La firma digital fue un cambio total. El cliente firmó desde su celular mientras yo estaba en otra obra. Todo automático.", stars: 5 },
+  { nombre: "Roberto P.", empresa: "RP Obras, Ovalle", texto: "Le mostré el render AI al cliente y cerró en el acto. Nunca había tenido una herramienta así. Vale cada peso.", stars: 5 },
 ];
 
 // ── Planes ────────────────────────────────────────────────────────────────────
@@ -45,22 +47,22 @@ const PLANES = [
   {
     id: "free", nombre: "Free", precio: "Gratis", periodo: "",
     color: COLORS.gray, highlight: false,
-    features: ["3 proyectos activos", "PDF con marca Obra Nova", "Presupuestos básicos", "App móvil PWA"],
-    noFeatures: ["Proyectos ilimitados", "PDF personalizado", "Export Excel", "Firma digital", "Facturas", "Templates"],
+    features: ["5 proyectos", "15 partidas por proyecto", "PDF con watermark", "5 mensajes Nova AI/mes", "App móvil PWA"],
+    noFeatures: ["PDF personalizado", "Firma digital", "Render AI", "/cotiza express"],
     cta: "Empezar gratis", href: `${APP_URL}`,
   },
   {
-    id: "pro", nombre: "Pro", precio: "$19.900", periodo: "/mes",
+    id: "pro", nombre: "Pro", precio: "$29.900", periodo: "/mes",
     color: COLORS.yellow, highlight: true,
     badge: "Más popular",
-    features: ["Proyectos ilimitados", "PDF con tu logo y colores", "Export Excel", "Firma digital cliente", "Facturas", "Templates reutilizables", "Agenda + control de obra", "Soporte prioritario"],
+    features: ["Proyectos ilimitados", "Nova AI 100 msg/mes + /genera + /cotiza", "PDF con tu logo", "Firma digital cliente", "Render AI (15/mes) + Before/After", "Portfolio público AI", "Export Excel", "MercadoPago integrado", "Portal del cliente con Nova"],
     noFeatures: [],
     cta: `Probar ${TRIAL_DAYS} días gratis`, href: `${APP_URL}`,
   },
   {
-    id: "team", nombre: "Team", precio: "$39.900", periodo: "/mes",
+    id: "empresa", nombre: "Empresa", precio: "$49.900", periodo: "/mes",
     color: "#60a5fa", highlight: false,
-    features: ["Todo Pro +", "Hasta 5 usuarios", "Roles y permisos", "Dashboard compartido", "Historial completo"],
+    features: ["Todo Pro +", "Hasta 5 usuarios", "CRM Kanban completo", "Renders ilimitados", "Nova AI ilimitada + benchmarks", "Export contable Bsale/Defontana", "Soporte prioritario WhatsApp"],
     noFeatures: [],
     cta: "Hablar con ventas", href: WA_CONTACTO,
   },
@@ -186,6 +188,27 @@ const GLOBAL_CSS = `
 
 // ── LandingPage ───────────────────────────────────────────────────────────────
 export default function LandingPage({ onGoToApp }) {
+  // SEO: imposta title e meta description per la landing
+  useEffect(() => {
+    document.title = "ObraNova — Software de Presupuestos para Constructoras Chile";
+    const setMeta = (name, content, prop = false) => {
+      const attr = prop ? "property" : "name";
+      let el = document.querySelector(`meta[${attr}="${name}"]`);
+      if (!el) { el = document.createElement("meta"); el.setAttribute(attr, name); document.head.appendChild(el); }
+      el.setAttribute("content", content);
+    };
+    setMeta("description", "Software con AI para constructoras chilenas. Genera presupuestos, firma digital, cobro con MercadoPago y portal del cliente. Prueba 14 días gratis.");
+    setMeta("keywords", "software construcción chile, presupuesto obra, cotización construcción, firma digital presupuesto, software constructoras");
+    setMeta("og:title", "ObraNova — Software de Presupuestos para Constructoras Chile", false);
+    setMeta("og:description", "Genera presupuestos con AI, firma digital y cobro integrado. 14 días gratis.", false);
+    setMeta("og:type", "website", false);
+    setMeta("og:url", "https://app.obranova.cl", false);
+    setMeta("twitter:card", "summary_large_image");
+    setMeta("twitter:title", "ObraNova — Presupuestos para Constructoras");
+    setMeta("twitter:description", "Software con AI para constructoras chilenas. 14 días gratis.");
+    return () => { document.title = "ObraNova"; };
+  }, []);
+
   const scrolled = useScrolled();
   const [featRef, featVisible] = useFadeIn();
   const [statsRef, statsVisible] = useFadeIn();
@@ -216,7 +239,12 @@ export default function LandingPage({ onGoToApp }) {
           <div style={{ maxWidth: 1100, margin: "0 auto", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             {/* Logo */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 32, height: 32, background: COLORS.yellow, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 16, color: COLORS.navy }}>O</div>
+              <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style={{ width: 32, height: 32 }}>
+                <rect x="4" y="8" width="50" height="84" rx="4" fill="white" opacity="0.95"/>
+                <rect x="16" y="24" width="22" height="48" rx="2" fill={COLORS.navy}/>
+                <polygon points="44,8 60,8 96,92 80,92" fill={COLORS.yellow}/>
+                <rect x="78" y="8" width="18" height="84" rx="3" fill={COLORS.yellow}/>
+              </svg>
               <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, fontSize: 20, letterSpacing: 1 }}>
                 OBRA<span style={{ color: COLORS.yellow }}>NOVA</span>
               </span>
@@ -299,17 +327,17 @@ export default function LandingPage({ onGoToApp }) {
                   margin: "0 0 24px",
                   letterSpacing: "-1px",
                 }}>
-                  PRESUPUESTOS<br />
-                  <span style={{ color: COLORS.yellow, fontStyle: "italic" }}>QUE CIERRAN</span><br />
-                  CONTRATOS
+                  DE EXCEL<br />
+                  <span style={{ color: COLORS.yellow, fontStyle: "italic" }}>A OBRA CERRADA</span><br />
+                  EN 10 MINUTOS
                 </h1>
 
                 <p style={{
                   fontSize: 17, color: COLORS.grayLight, lineHeight: 1.65,
                   margin: "0 0 36px", maxWidth: 460,
                 }}>
-                  El software de gestión para constructoras y maestros en Chile.
-                  Presupuesta, firma y controla tus obras — todo desde el celular.
+                  El software con AI para constructoras chilenas. Genera presupuestos, 
+                  cobra con MercadoPago y firma digitalmente — todo desde el celular.
                 </p>
 
                 <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
@@ -419,14 +447,44 @@ export default function LandingPage({ onGoToApp }) {
           </div>
         </section>
 
+        {/* ── PROBLEMA → SOLUCIÓN ── */}
+        <section style={{ padding: "80px 24px", background: COLORS.navyMid, borderTop: `1px solid ${COLORS.border}` }}>
+          <div style={{ maxWidth: 900, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 48 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.yellow, letterSpacing: 2, marginBottom: 12 }}>EL PROBLEMA</div>
+              <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 900, margin: "0 0 16px", lineHeight: 1.1 }}>
+                ¿TE SUENA FAMILIAR?
+              </h2>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
+              {[
+                { emoji: "😩", problema: "Haces presupuestos en Excel", solucion: "Nova genera 12 partidas con precios reales en 30 segundos" },
+                { emoji: "📱", problema: "Los mandas por WhatsApp y se pierden", solucion: "PDF profesional con tu logo, enviado con link directo al cliente" },
+                { emoji: "🖊️", problema: "El cliente tarda semanas en firmar", solucion: "Firma digital desde el celular del cliente, sin instalar nada" },
+                { emoji: "💸", problema: "No sabes cuándo te van a pagar", solucion: "QR MercadoPago en el PDF, notificación automática al cobrar" },
+              ].map((item, i) => (
+                <div key={i} style={{ background: COLORS.navy, borderRadius: 12, padding: "20px 18px", border: `1px solid ${COLORS.border}` }}>
+                  <div style={{ fontSize: 28, marginBottom: 10 }}>{item.emoji}</div>
+                  <div style={{ fontSize: 13, color: "#fc8181", fontWeight: 700, marginBottom: 8, textDecoration: "line-through", opacity: 0.8 }}>
+                    {item.problema}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#68d391", fontWeight: 600, lineHeight: 1.5 }}>
+                    ✓ {item.solucion}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ── STATS ── */}
         <section ref={statsRef} style={{ padding: "60px 24px", borderTop: `1px solid ${COLORS.border}`, borderBottom: `1px solid ${COLORS.border}` }}>
           <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 40, textAlign: "center" }}>
             {[
-              { label: "Presupuestos creados", value: 2400, suffix: "+" },
-              { label: "Constructoras activas", value: 50, suffix: "+" },
-              { label: "Firmas digitales", value: 890, suffix: "+" },
-              { label: "Horas ahorradas/mes", value: 120, suffix: "h" },
+              { label: "Horas ahorradas por presupuesto", value: 2, suffix: "h" },
+              { label: "Módulos en producción", value: 35, suffix: "+" },
+              { label: "Minutos al primer presupuesto", value: 10, suffix: " min" },
+              { label: "Dias de prueba gratis", value: 14, suffix: " días" },
             ].map(s => (
               <div key={s.label} className={`fade-up ${statsVisible ? "visible" : ""}`}>
                 <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 52, fontWeight: 900, color: COLORS.yellow, lineHeight: 1 }}>
@@ -438,17 +496,55 @@ export default function LandingPage({ onGoToApp }) {
           </div>
         </section>
 
+        {/* ── VIDEO DEMO ── */}
+        <section style={{ padding: "80px 24px", background: COLORS.navyMid, borderTop: `1px solid ${COLORS.border}` }}>
+          <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.yellow, letterSpacing: 2, marginBottom: 12 }}>DEMO</div>
+            <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 900, margin: "0 0 32px", lineHeight: 1 }}>
+              MÍRALO EN ACCIÓN
+            </h2>
+            {/* Video placeholder — reemplazar con iframe de YouTube */}
+            <div style={{
+              position: "relative", paddingBottom: "56.25%", height: 0,
+              background: COLORS.navy, borderRadius: 16, overflow: "hidden",
+              border: `1px solid ${COLORS.border}`,
+              boxShadow: "0 24px 64px rgba(0,0,0,0.4)",
+            }}>
+              {/* TODO: reemplazar con <iframe src="https://www.youtube.com/embed/TU_VIDEO_ID" /> */}
+              <div style={{
+                position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center", gap: 16,
+              }}>
+                <div style={{
+                  width: 72, height: 72, borderRadius: "50%",
+                  background: COLORS.yellow, display: "flex", alignItems: "center",
+                  justifyContent: "center", cursor: "pointer",
+                  boxShadow: `0 0 0 12px ${COLORS.yellow}22`,
+                }}>
+                  <span style={{ fontSize: 28, marginLeft: 4 }}>▶</span>
+                </div>
+                <div style={{ color: COLORS.gray, fontSize: 14 }}>
+                  Demo disponible próximamente
+                </div>
+                <div style={{ fontSize: 12, color: COLORS.gray }}>
+                  Presupuesto → firma → cobro en menos de 5 minutos
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ── FEATURES ── */}
         <section id="features" ref={featRef} style={{ padding: "100px 24px" }}>
           <div style={{ maxWidth: 1100, margin: "0 auto" }}>
             <div style={{ textAlign: "center", marginBottom: 60 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.yellow, letterSpacing: 2, marginBottom: 12 }}>FUNCIONES</div>
               <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 900, margin: 0, lineHeight: 1 }}>
-                TODO LO QUE NECESITAS<br />
-                <span style={{ color: COLORS.yellow }}>PARA CRECER</span>
+                TODO EN UN SOLO<br />
+                <span style={{ color: COLORS.yellow }}>SOFTWARE</span>
               </h2>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
               {FEATURES.map((f, i) => (
                 <div key={i} className={`feature-card fade-up ${featVisible ? "visible" : ""}`} style={{ transitionDelay: `${i * 80}ms` }}>
                   <div style={{ fontSize: 32, marginBottom: 14 }}>{f.icon}</div>
@@ -543,7 +639,7 @@ export default function LandingPage({ onGoToApp }) {
                     ))}
                   </div>
 
-                  <a href={plan.href} onClick={plan.id !== "team" ? goToApp : undefined}
+                  <a href={plan.href} onClick={plan.id !== "empresa" ? goToApp : undefined}
                     className={plan.highlight ? "landing-btn-primary" : "landing-btn-ghost"}
                     style={{ width: "100%", justifyContent: "center", fontSize: 14 }}>
                     {plan.cta}
@@ -551,6 +647,19 @@ export default function LandingPage({ onGoToApp }) {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* ── FAQ ── */}
+        <section style={{ padding: "80px 24px", borderTop: `1px solid ${COLORS.border}` }}>
+          <div style={{ maxWidth: 720, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 48 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: COLORS.yellow, letterSpacing: 2, marginBottom: 12 }}>FAQ</div>
+              <h2 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 900, margin: 0 }}>
+                PREGUNTAS FRECUENTES
+              </h2>
+            </div>
+            <FaqSection />
           </div>
         </section>
 
@@ -589,7 +698,12 @@ export default function LandingPage({ onGoToApp }) {
         <footer style={{ padding: "40px 24px", borderTop: `1px solid ${COLORS.border}` }}>
           <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 28, height: 28, background: COLORS.yellow, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 14, color: COLORS.navy }}>O</div>
+              <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style={{ width: 28, height: 28 }}>
+                <rect x="4" y="8" width="50" height="84" rx="4" fill="white" opacity="0.95"/>
+                <rect x="16" y="24" width="22" height="48" rx="2" fill={COLORS.navy}/>
+                <polygon points="44,8 60,8 96,92 80,92" fill={COLORS.yellow}/>
+                <rect x="78" y="8" width="18" height="84" rx="3" fill={COLORS.yellow}/>
+              </svg>
               <span style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 800, fontSize: 16, letterSpacing: 1 }}>
                 OBRA<span style={{ color: COLORS.yellow }}>NOVA</span>
               </span>
@@ -601,9 +715,96 @@ export default function LandingPage({ onGoToApp }) {
               <span style={{ color: COLORS.gray, fontSize: 12 }}>© {new Date().getFullYear()} Obra Nova</span>
             </div>
           </div>
-        </footer>
+        
+      {/* Links legali */}
+      <div style={{ textAlign: "center", padding: "16px 24px", borderTop: "1px solid rgba(255,255,255,.1)" }}>
+        <a href="/privacidad" style={{ color: "rgba(255,255,255,.5)", fontSize: 12, textDecoration: "none", marginRight: 16 }}>
+          Política de Privacidad
+        </a>
+        <a href="/terminos" style={{ color: "rgba(255,255,255,.5)", fontSize: 12, textDecoration: "none" }}>
+          Términos de Uso
+        </a>
+      </div>
+    </footer>
 
       </div>
+
+      {/* ── WHATSAPP BUBBLE ── */}
+      <a href={WA_CONTACTO} target="_blank" rel="noopener noreferrer"
+        title="Habla con nosotros por WhatsApp"
+        style={{
+          position: "fixed", bottom: 24, left: 24, zIndex: 999,
+          width: 56, height: 56, borderRadius: "50%",
+          background: "#25D366", color: "white",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 4px 20px rgba(37,211,102,.4)",
+          fontSize: 26, textDecoration: "none",
+          animation: "waPulse 3s ease-in-out infinite",
+        }}>
+        💬
+        <style>{`@keyframes waPulse{0%,100%{box-shadow:0 4px 20px rgba(37,211,102,.4)}50%{box-shadow:0 4px 28px rgba(37,211,102,.7)}}`}</style>
+      </a>
+
     </>
+  );
+}
+
+// ── FAQ Component ──────────────────────────────────────────────────────────────
+function FaqSection() {
+  const [open, setOpen] = useState(null);
+  const faqs = [
+    {
+      q: "¿Necesito tarjeta de crédito para el período de prueba?",
+      a: "No. Los 14 días de prueba del plan Pro son completamente gratis y sin tarjeta. Al terminar, puedes continuar en el plan Free o suscribirte.",
+    },
+    {
+      q: "¿Funciona en el celular?",
+      a: "Sí. ObraNova es una PWA (Progressive Web App) optimizada para móvil. Puedes instalarla en tu pantalla de inicio como si fuera una app nativa, sin pasar por la App Store.",
+    },
+    {
+      q: "¿Puedo importar mis presupuestos de Excel?",
+      a: "Puedes exportar tus presupuestos de ObraNova a Excel. Para importar desde Excel, Nova AI puede generar las partidas automáticamente con el comando /genera, o puedes agregarlas manualmente.",
+    },
+    {
+      q: "¿Mis datos están seguros?",
+      a: "Sí. Todos los datos se almacenan en Google Firebase (región Santiago, Chile), con backups nocturnos automáticos. El acceso está protegido por roles y los datos de cada empresa están completamente aislados.",
+    },
+    {
+      q: "¿Puedo cancelar cuando quiera?",
+      a: "Sí. Sin contratos de permanencia. Cancelas desde tu panel en cualquier momento y no se te cobra el siguiente mes.",
+    },
+    {
+      q: "¿Funciona para todo tipo de obra?",
+      a: "Sí. Remodelaciones, construcción en seco, instalaciones eléctricas y sanitarias, pintura, paisajismo y más. Las categorías y partidas son completamente personalizables.",
+    },
+  ];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {faqs.map((faq, i) => (
+        <div key={i} style={{
+          background: COLORS.navyMid, borderRadius: 10,
+          border: `1px solid ${open === i ? COLORS.yellow + "44" : COLORS.border}`,
+          overflow: "hidden", transition: "border-color .2s",
+        }}>
+          <button onClick={() => setOpen(open === i ? null : i)} style={{
+            width: "100%", padding: "16px 18px", background: "none", border: "none",
+            cursor: "pointer", display: "flex", justifyContent: "space-between",
+            alignItems: "center", gap: 12,
+          }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: COLORS.white, textAlign: "left" }}>
+              {faq.q}
+            </span>
+            <span style={{ color: COLORS.yellow, fontSize: 18, flexShrink: 0, transition: "transform .2s",
+              transform: open === i ? "rotate(45deg)" : "rotate(0deg)" }}>+</span>
+          </button>
+          {open === i && (
+            <div style={{ padding: "0 18px 16px", fontSize: 14, color: COLORS.gray, lineHeight: 1.65 }}>
+              {faq.a}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }

@@ -29,6 +29,29 @@ const COLORES_CAT = {
 };
 
 // ── Componente principal ──────────────────────────────────────────────────────
+
+// ── Match fuzzy nombre material → listino / magazzino ─────────────────────────
+const norm = (s = "") => s.toLowerCase()
+  .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  .replace(/[^a-z0-9\s]/g, "").trim();
+
+function matchItem(matNombre, lista, campoNombre) {
+  const mn = norm(matNombre);
+  if (!mn || !lista?.length) return null;
+  let found = lista.find(x => norm(x[campoNombre]) === mn);
+  if (found) return found;
+  found = lista.find(x => { const xn = norm(x[campoNombre]); return xn.includes(mn) || mn.includes(xn); });
+  if (found) return found;
+  const mnWords = mn.split(/\s+/).filter(w => w.length > 2);
+  if (mnWords.length > 0) {
+    found = lista.find(x => {
+      const xWords = norm(x[campoNombre]).split(/\s+/).filter(w => w.length > 2);
+      return mnWords.filter(w => xWords.includes(w)).length >= Math.min(2, mnWords.length);
+    });
+  }
+  return found || null;
+}
+
 export default function TabKitMateriali({
   kits = [],
   cargando = false,
@@ -41,6 +64,9 @@ export default function TabKitMateriali({
   canAddKit = () => true,
   kitsRestanti = Infinity,
   onPaywall = () => {},
+  listino = [],
+  magItems = [],
+  onGoToCalcolatore = null,
 }) {
   const [vista, setVista] = useState("galeria"); // "galeria" | "editor" | "detalle"
   const [filtrocat, setFiltroCat] = useState("Todos");
@@ -125,6 +151,36 @@ export default function TabKitMateriali({
     onToast?.(`✅ ${kit.materiales?.length || 0} materiales de "${kit.nombre}" agregados a Costos`);
   }, [addPartida, onToast]);
 
+  // ── Calcola con listino + magazzino → pre-popola Calcolatore ─────────────
+  const calcularConListino = useCallback((kit, m2Val = 1) => {
+    if (!onGoToCalcolatore) { onToast?.("⚠️ Función no disponible"); return; }
+    const righe = (kit.materiales || []).map(mat => {
+      const cant = +(mat.cantidad * m2Val).toFixed(3);
+      // 1. Busca en listino (nombre → precioCliente)
+      const listinoMatch = matchItem(mat.nombre, listino, "nombre");
+      // 2. Busca en magazzino (nombre → nome, prezzo, giacenza)
+      const magMatch = matchItem(mat.nombre, magItems, "nome");
+      const pu = listinoMatch?.precioCliente || listinoMatch?.precioCompra || magMatch?.prezzo || 0;
+      const giacenza = magMatch?.giacenza ?? null;
+      const unidad = mat.unidad || listinoMatch?.unidad || magMatch?.unita || "un";
+      return {
+        desc:    mat.nombre,
+        tipo:    "material",
+        unidad,
+        cant,
+        pu,
+        _fromKit:    kit.nombre,
+        _listinoHit: !!listinoMatch,
+        _magHit:     !!magMatch,
+        _giacenza:   giacenza,
+        _nota:       mat.nota || "",
+      };
+    });
+    const matched = righe.filter(r => r._listinoHit || r._magHit).length;
+    onToast?.(`📦 Kit "${kit.nombre}" → Calculadora (${matched}/${righe.length} precios encontrados)`);
+    onGoToCalcolatore({ righe, nombre: kit.nombre, m2: m2Val });
+  }, [onGoToCalcolatore, listino, magItems, onToast]);
+
   // ── Importar predefinido ──────────────────────────────────────────────────
   const handleImportar = async (kitPred) => {
     await onImportarPredefinito?.(kitPred);
@@ -184,26 +240,51 @@ export default function TabKitMateriali({
           <div style={{ fontSize: 13, fontWeight: 700, color: "#333", marginBottom: 8 }}>
             Materiales ({kit.materiales?.length || 0})
           </div>
-          {kit.materiales?.map((mat, i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-              padding: "10px 12px", background: i % 2 === 0 ? "#fff" : "#f9f9f9",
+          {kit.materiales?.map((mat, i) => {
+            const lMatch = matchItem(mat.nombre, listino, "nombre");
+            const mMatch = matchItem(mat.nombre, magItems, "nome");
+            const pu = lMatch?.precioCliente || lMatch?.precioCompra || mMatch?.prezzo || 0;
+            const giac = mMatch?.giacenza ?? null;
+            const cantScaled = +(mat.cantidad * m2).toFixed(3);
+            return (
+            <div key={i} style={{ padding: "10px 12px", background: i % 2 === 0 ? "#fff" : "#f9f9f9",
               borderRadius: 8, marginBottom: 4, border: "1px solid #f0f0f0" }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{mat.nombre}</div>
-                {mat.nota && <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{mat.nota}</div>}
-              </div>
-              <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: "#1a1a2e" }}>
-                  {+(mat.cantidad * m2).toFixed(3)}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                    {mat.nombre}
+                    {lMatch && <span style={{ fontSize: 10, background: "#e8f5e9", color: "#276749", borderRadius: 4, padding: "1px 6px" }}>📋 listino</span>}
+                    {!lMatch && mMatch && <span style={{ fontSize: 10, background: "#e3f2fd", color: "#1565c0", borderRadius: 4, padding: "1px 6px" }}>🏭 bodega</span>}
+                  </div>
+                  {mat.nota && <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{mat.nota}</div>}
+                  {giac !== null && (
+                    <div style={{ fontSize: 11, marginTop: 3, color: giac >= cantScaled ? "#276749" : "#c53030" }}>
+                      {giac >= cantScaled ? "✓" : "⚠️"} Stock: {giac} {mMatch?.unita}
+                      {giac < cantScaled && ` — faltan ${+(cantScaled - giac).toFixed(2)}`}
+                    </div>
+                  )}
                 </div>
-                <div style={{ fontSize: 11, color: "#888" }}>{mat.unidad}</div>
+                <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "#1a1a2e" }}>{cantScaled}</div>
+                  <div style={{ fontSize: 11, color: "#888" }}>{mat.unidad}</div>
+                  {pu > 0 && <div style={{ fontSize: 11, color: "#553c9a", marginTop: 1 }}>${pu.toLocaleString("es-CL")}/u</div>}
+                </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Acciones */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {onGoToCalcolatore && (
+            <button onClick={() => calcularConListino(kit, m2)}
+              style={{ padding: "12px", background: "#553c9a", color: "#fff", border: "none",
+                borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              🧮 Calcular con listino → Calculadora
+            </button>
+          )}
           {addPartida && (
             <button onClick={() => agregarKitACostos(kit, m2)}
               style={{ padding: "12px", background: "#1a1a2e", color: "#fff", border: "none",

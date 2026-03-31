@@ -8,10 +8,20 @@ import { LOGO_URL } from "../../utils/logo";
 
 const CC = CAT_COLORS;
 
-export function TabResumen({ partidas, pct, cats, iva, t }) {
-  const totals = useMemo(() => calcTotals(partidas, pct), [partidas, pct]);
-  const { cd, ci, gf, imprevistos: imprev, sub, util, total, iva: ivaAmt, totalIva } = totals;
-  const margen = total > 0 ? (util / total) * 100 : 0;
+export function TabResumen({ partidas, pct, cats, iva, t, descuento = { tipo: "pct", valor: 0, descripcion: "" }, setDescuento, aiRenders = [], plan = "free", onShowBenchmark }) {
+  const totals = useMemo(() => calcTotals(partidas, pct, descuento), [partidas, pct, descuento]);
+  const { cd, ci, gf, imprevistos: imprev, sub, util, total, descuentoAmt, totalConDesc, iva: ivaAmt, totalIva } = totals;
+  const margen = totalConDesc > 0 ? (util / totalConDesc) * 100 : 0;
+
+  // Visibilità righe desglose — persistita in localStorage
+  const [hidden, setHidden] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("on_desglose_hidden") || "{}"); } catch { return {}; }
+  });
+  const toggleRow = (key) => setHidden(prev => {
+    const next = { ...prev, [key]: !prev[key] };
+    localStorage.setItem("on_desglose_hidden", JSON.stringify(next));
+    return next;
+  });
 
   const pieData = useMemo(() => cats
     .map((cat, i) => ({
@@ -20,37 +30,83 @@ export function TabResumen({ partidas, pct, cats, iva, t }) {
     }))
     .filter(d => d.value > 0), [cats, partidas]);
 
+  const hasDesc = descuentoAmt > 0;
+
+  const rows = [
+    { key: "cd",     l: t.costosDirectos,                           v: cd,    c: "#2b6cb0" },
+    { key: "ci",     l: `${t.costosIndirectos} (${pct.ci}%)`,       v: ci,    c: "#276749" },
+    { key: "gf",     l: `${t.gastosFijos} (${pct.gf}%)`,            v: gf,    c: "#c05621" },
+    { key: "imprev", l: `${t.imprevistos} (${pct.imprevistos}%)`,   v: imprev,c: "#b7791f" },
+    { key: "sub",    l: t.subtotal || "Subtotal",                   v: sub,   c: "#2d3748", bold: true },
+    { key: "util",   l: `${t.utilidad} (${pct.utilidad}%)`,         v: util,  c: "#553c9a" },
+    { key: "total",  l: "Total s/descuento",                        v: total, c: "#1a365d", bold: true },
+    ...(hasDesc ? [
+      { key: "desc",   l: `Descuento${descuento.tipo === "pct" ? ` (${descuento.valor}% s/neto)` : ""}`, v: -descuentoAmt, c: "#e53e3e" },
+      { key: "totalcd",l: "Total c/descuento",                      v: totalConDesc, c: "#1a365d", bold: true, big: true },
+    ] : [
+      { key: "totalcd",l: t.totalProyecto,                          v: total, c: "#1a365d", bold: true, big: true },
+    ]),
+  ];
+
+  // Checkbox style
+  const cbStyle = (checked) => ({
+    width: 14, height: 14, accentColor: "#2b6cb0", cursor: "pointer", margin: 0, flexShrink: 0,
+  });
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 14 }}>
       {/* Desglose */}
       <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: "#1a365d", marginBottom: 12, borderBottom: "2px solid #ebf8ff", paddingBottom: 7 }}>
-          📊 {t.desglosePresup}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, borderBottom: "2px solid #ebf8ff", paddingBottom: 7 }}>
+          <span style={{ fontWeight: 700, fontSize: 14, color: "#1a365d" }}>📊 {t.desglosePresup}</span>
+          <button
+            onClick={() => {
+              const toggleable = rows.filter(r => !r.big);
+              const allHidden = toggleable.every(r => hidden[r.key]);
+              const next = {};
+              if (!allHidden) toggleable.forEach(r => { next[r.key] = true; });
+              setHidden(next);
+              localStorage.setItem("on_desglose_hidden", JSON.stringify(next));
+            }}
+            style={{ fontSize: 11, color: "#718096", background: "#f7fafc", border: "1px solid #e2e8f0", borderRadius: 6, padding: "3px 8px", cursor: "pointer" }}
+          >
+            {rows.filter(r => !r.big).every(r => hidden[r.key]) ? "Mostrar todo" : "Ocultar detalles"}
+          </button>
         </div>
-        {[
-          { l: t.costosDirectos,                           v: cd,    c: "#2b6cb0" },
-          { l: `${t.costosIndirectos} (${pct.ci}%)`,       v: ci,    c: "#276749" },
-          { l: `${t.gastosFijos} (${pct.gf}%)`,            v: gf,    c: "#c05621" },
-          { l: `${t.imprevistos} (${pct.imprevistos}%)`,   v: imprev,c: "#b7791f" },
-          { l: t.subtotal || "Subtotal",                   v: sub,   c: "#2d3748", bold: true },
-          { l: `${t.utilidad} (${pct.utilidad}%)`,         v: util,  c: "#553c9a" },
-          { l: t.totalProyecto,                            v: total, c: "#1a365d", bold: true, big: true },
-        ].map(r => (
-          <div key={r.l} style={{
-            display: "flex", justifyContent: "space-between",
-            padding: r.big ? "11px" : "7px 3px",
-            borderTop: r.big ? "2px solid #e2e8f0" : r.bold ? "1px solid #e2e8f0" : "none",
-            background: r.big ? "#ebf8ff" : "transparent",
-            borderRadius: r.big ? 8 : 0,
-          }}>
-            <span style={{ fontSize: r.big ? 14 : 12, color: r.c, fontWeight: r.bold || r.big ? 700 : 400 }}>{r.l}</span>
-            <span style={{ fontSize: r.big ? 15 : 13, color: r.c, fontWeight: r.bold || r.big ? 800 : 600 }}>{fmt(r.v)}</span>
-          </div>
-        ))}
+        {rows.map(r => {
+          const isHidden = hidden[r.key];
+          // TOTAL finale — sempre visibile
+          if (r.big) return (
+            <div key={r.key} style={{ display: "flex", justifyContent: "space-between", padding: "11px", borderTop: "2px solid #e2e8f0", background: "#ebf8ff", borderRadius: 8, marginTop: 4 }}>
+              <span style={{ fontSize: 14, color: r.c, fontWeight: 700 }}>{r.l}</span>
+              <span style={{ fontSize: 15, color: r.c, fontWeight: 800 }}>{fmt(r.v)}</span>
+            </div>
+          );
+          // Tutte le altre righe — checkbox toggle
+          return (
+            <div key={r.key} style={{ display: "flex", alignItems: "center", gap: 6, padding: r.bold ? "7px 3px" : "5px 3px", borderTop: r.bold ? "1px solid #e2e8f0" : "none" }}>
+              <input type="checkbox" checked={!isHidden} onChange={() => toggleRow(r.key)} style={cbStyle(!isHidden)} title={isHidden ? "Mostrar" : "Ocultar"} />
+              {isHidden
+                ? <span style={{ fontSize: 11, color: "#a0aec0", flex: 1 }}>{r.l}</span>
+                : <>
+                    <span style={{ fontSize: 12, color: r.c, fontWeight: r.bold ? 700 : 400, flex: 1 }}>{r.l}</span>
+                    <span style={{ fontSize: 13, color: r.c, fontWeight: r.bold ? 800 : 600 }}>{fmt(r.v)}</span>
+                  </>
+              }
+            </div>
+          );
+        })}
+        {/* IVA — con checkbox */}
         {iva && <>
-          <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 3px", borderTop: "1px solid #e2e8f0" }}>
-            <span style={{ fontSize: 12, color: "#c05621" }}>IVA 19%</span>
-            <span style={{ fontSize: 13, color: "#c05621", fontWeight: 600 }}>{fmt(ivaAmt)}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 3px", borderTop: "1px solid #e2e8f0" }}>
+            <input type="checkbox" checked={!hidden.iva} onChange={() => toggleRow("iva")} style={cbStyle(!hidden.iva)} />
+            {hidden.iva
+              ? <span style={{ fontSize: 11, color: "#a0aec0", flex: 1 }}>IVA 19%</span>
+              : <>
+                  <span style={{ fontSize: 12, color: "#c05621", flex: 1 }}>IVA 19%</span>
+                  <span style={{ fontSize: 13, color: "#c05621", fontWeight: 600 }}>{fmt(ivaAmt)}</span>
+                </>
+            }
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", padding: 11, background: "#1a365d", borderRadius: 8, marginTop: 4 }}>
             <span style={{ fontSize: 14, color: "white", fontWeight: 800 }}>TOTAL {t.conIVA}</span>
@@ -60,6 +116,32 @@ export function TabResumen({ partidas, pct, cats, iva, t }) {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {/* Descuento */}
+        {setDescuento && (
+          <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#1a365d", marginBottom: 12, borderBottom: "2px solid #ebf8ff", paddingBottom: 7 }}>
+              🏷️ Descuento
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+              <select value={descuento.tipo} onChange={e => setDescuento({ tipo: e.target.value })}
+                style={{ padding: "7px 10px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12, color: "#1a365d" }}>
+                <option value="pct">Porcentaje (%)</option>
+                <option value="fijo">Monto fijo ($)</option>
+              </select>
+              <input type="number" min="0" step={descuento.tipo === "pct" ? "0.5" : "1000"}
+                value={descuento.valor || ""} placeholder={descuento.tipo === "pct" ? "0%" : "$0"}
+                onChange={e => setDescuento({ valor: parseFloat(e.target.value) || 0 })}
+                style={{ width: 90, padding: "7px 10px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12, textAlign: "right" }} />
+              {descuentoAmt > 0 && (
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#e53e3e" }}>−{fmt(descuentoAmt)}</span>
+              )}
+            </div>
+            <input type="text" value={descuento.descripcion || ""} placeholder="Descripción del descuento (opcional)"
+              onChange={e => setDescuento({ descripcion: e.target.value })}
+              style={{ width: "100%", padding: "7px 10px", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12, boxSizing: "border-box" }} />
+          </div>
+        )}
+
         {/* Análisis margen */}
         <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: "#1a365d", marginBottom: 12, borderBottom: "2px solid #ebf8ff", paddingBottom: 7 }}>
@@ -68,7 +150,8 @@ export function TabResumen({ partidas, pct, cats, iva, t }) {
           {[
             { l: t.costoNeto,       v: fmt(cd),                c: "#2b6cb0" },
             { l: t.margenPartidas,  v: fmt(util),              c: "#276749" },
-            { l: t.totalCliente,    v: fmt(iva ? totalIva : total), c: "#1a365d" },
+            ...(hasDesc ? [{ l: "Descuento",  v: `−${fmt(descuentoAmt)}`, c: "#e53e3e" }] : []),
+            { l: t.totalCliente,    v: fmt(iva ? totalIva : totalConDesc), c: "#1a365d" },
             { l: t.margenTotal,     v: fmtPct(margen),         c: margen > 15 ? "#276749" : margen > 8 ? "#c05621" : "#c53030", big: true },
           ].map(r => (
             <div key={r.l} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f7fafc" }}>
@@ -87,6 +170,29 @@ export function TabResumen({ partidas, pct, cats, iva, t }) {
             <PieChart data={pieData} size={130} />
           </div>
         )}
+
+        {/* Renders AI del proyecto */}
+        {aiRenders && aiRenders.length > 0 && (
+          <div style={{ background: "white", borderRadius: 12, padding: 18, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#1a365d", marginBottom: 12, borderBottom: "2px solid #ebf8ff", paddingBottom: 7 }}>
+              🎨 Visualización AI del proyecto
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: aiRenders.length === 1 ? "1fr" : "1fr 1fr", gap: 10 }}>
+              {aiRenders.filter(r => r.ok !== false && r.imageUrl).slice(0, 4).map((r, i) => (
+                <div key={i} style={{ borderRadius: 8, overflow: "hidden", border: "1px solid #e2e8f0" }}>
+                  <img src={r.imageUrl} alt={r.label || `Render ${i+1}`} style={{ width: "100%", height: aiRenders.length === 1 ? 220 : 140, objectFit: "cover", display: "block" }} />
+                  <div style={{ padding: "5px 8px", background: "#f7fafc", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: "#1a365d" }}>{r.label || r.roomType || `Render ${i+1}`}</span>
+                    <span style={{ fontSize: 9, color: "#a0aec0" }}>Render AI</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 9, color: "#a0aec0", marginTop: 6, textAlign: "center", fontStyle: "italic" }}>
+              Visualización generada por inteligencia artificial — el resultado final puede variar
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -94,41 +200,110 @@ export function TabResumen({ partidas, pct, cats, iva, t }) {
 
 // ─── TabVistaCliente ──────────────────────────────────────────────────────────
 
-export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, setCatVisKey, iva, estado, currentId, validez, t, onInviaFirma, firme = [], fotos = [], plan = "free", onTrackPdf }) {
+export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, setCatVisKey, iva, estado, currentId, validez, t, onInviaFirma, firme = [], fotos = [], plan = "free", trialEndsAt = null, onTrackPdf, descuento = { tipo: "pct", valor: 0, descripcion: "" }, setDescuento, aiRenders = [], workspaceId, onShowBenchmark }) {
   const pdf = usePDFSettings();
-  const isPro = plan === "pro" || plan === "team" || plan === "enterprise";
+  const isTrialActive = trialEndsAt && new Date(trialEndsAt) > new Date();
+  const isPro = plan === "pro" || plan === "empresa" || isTrialActive;
+  // Free: sempre logo Obra Nova. Pro/Empresa: logo personalizzato se configurato, altrimenti logo ON
   const logoEffettivo = isPro && pdf.logoUrl ? pdf.logoUrl : LOGO_URL;
-  const totals = useMemo(() => calcTotals(partidas, pct), [partidas, pct]);
-  const { cd, ci, gf, imprevistos: imprev, sub, util, total, iva: ivaAmt, totalIva } = totals;
+  // Header label Free — mostrato nell'intestazione del PDF Free
+  const showFreeBranding = !isPro;
+  const totals = useMemo(() => calcTotals(partidas, pct, descuento), [partidas, pct, descuento]);
+  const { cd, ci, gf, imprevistos: imprev, sub, util, total, descuentoAmt, totalConDesc, iva: ivaAmt, totalIva } = totals;
 
   const venceDate = info.fecha
     ? new Date(new Date(info.fecha).getTime() + validez * 86400000).toLocaleDateString("es-CL")
     : "—";
 
+  // Visibilità righe desglose financiero
+  const [hidVC, setHidVC] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("on_desglose_vc_hidden") || "{}"); } catch { return {}; }
+  });
+  const toggleVC = (key) => setHidVC(prev => {
+    const n = { ...prev, [key]: !prev[key] };
+    localStorage.setItem("on_desglose_vc_hidden", JSON.stringify(n));
+    return n;
+  });
+
   return (
     <div>
-      {/* ── Pannello Compartir ───────────────────────────────────────────────── */}
+      {/* ── Banner scadenza preventivo ───────────────────────────────────────── */}
+      {(() => {
+        if (!info.fecha || !["Enviado","Borrador"].includes(estado)) return null;
+        const vence = new Date(new Date(info.fecha).getTime() + validez * 86400000);
+        const oggi  = new Date();
+        const diff  = Math.ceil((vence - oggi) / 86400000);
+        if (diff > 5) return null;
+        const scaduto = diff <= 0;
+        const num  = (info.telefono||"").replace(/[\s\-\+\(\)]/g,"");
+        const norm = num ? (num.startsWith("56")?num:num.startsWith("9")?`56${num}`:`569${num}`) : "";
+        const msg  = scaduto
+          ? `Hola ${info.cliente||""}👋\n\n⚠️ El presupuesto para *${info.descripcion||"tu proyecto"}* venció el ${vence.toLocaleDateString("es-CL")}.\n\n¿Quieres que lo renovemos? Estamos disponibles.\n\n_${info.empresa||"Obra Nova"}_`
+          : `Hola ${info.cliente||""}👋\n\n⏰ El presupuesto para *${info.descripcion||"tu proyecto"}* vence el *${vence.toLocaleDateString("es-CL")}* (en ${diff} día${diff===1?"":"s"}).\n\n¿Tienes alguna consulta antes de decidir?\n\n_${info.empresa||"Obra Nova"}_`;
+        const waUrl = norm ? `https://wa.me/${norm}?text=${encodeURIComponent(msg)}` : null;
+        return (
+          <div className="no-print" style={{
+            display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:8,
+            background: scaduto ? "#fff5f5" : diff <= 2 ? "#fffbeb" : "#ebf8ff",
+            border: `1px solid ${scaduto ? "#feb2b2" : diff <= 2 ? "#fbd38d" : "#bee3f8"}`,
+            borderRadius:10, padding:"10px 14px", marginBottom:14,
+          }}>
+            <div style={{ fontSize:13, fontWeight:700, color: scaduto ? "#c53030" : diff <= 2 ? "#c05621" : "#2b6cb0" }}>
+              {scaduto ? "⚠️ Presupuesto vencido" : diff === 0 ? "🔴 Vence hoy" : `⏰ Vence en ${diff} día${diff===1?"":"s"} — ${vence.toLocaleDateString("es-CL")}`}
+            </div>
+            {waUrl && (
+              <button onClick={() => window.open(waUrl,"_blank","noopener,noreferrer")}
+                style={{ padding:"6px 14px",background:"#25D366",color:"white",border:"none",borderRadius:8,cursor:"pointer",fontWeight:700,fontSize:12,display:"flex",alignItems:"center",gap:6 }}>
+                💬 Recordar al cliente
+              </button>
+            )}
+          </div>
+        );
+      })()}
       <div className="no-print" style={{ background:"white",borderRadius:12,padding:"14px 18px",marginBottom:14,boxShadow:"0 1px 4px rgba(0,0,0,.07)" }}>
         <div style={{ fontWeight:700,fontSize:13,color:"#1a365d",marginBottom:12 }}>📤 Compartir presupuesto</div>
-        <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
 
           {/* PDF */}
-          <button onClick={() => { window.print(); onTrackPdf?.("download"); }}
-            style={{ flex:1,minWidth:140,padding:"11px 14px",background:"#2b6cb0",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
-            🖨️ Descargar PDF
+          <button onClick={() => { const sb = document.getElementById("app-sidebar"); const prev = sb?.style.display; if (sb) sb.style.display = "none"; window.print(); if (sb) sb.style.display = prev ?? ""; onTrackPdf?.("download"); }}
+            style={{ padding:"11px 14px",background:"#2b6cb0",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
+            🖨️ PDF
           </button>
+
+          {/* Benchmark Report */}
+          {partidas.length >= 3 && onShowBenchmark && (
+            <button onClick={onShowBenchmark}
+              style={{ padding:"11px 14px",background:"linear-gradient(135deg,#1a365d,#553c9a)",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
+              📊 Benchmark
+            </button>
+          )}
 
           {/* WhatsApp + PDF: descarga PDF primero, luego abre WA con link */}
           {info.telefono && (() => {
-            const total = iva ? totals.totalIva : totals.total;
+            const total = iva ? totals.totalIva : totals.totalConDesc;
             const num = (info.telefono||"").replace(/[\s\-\+\(\)]/g,"");
             const norm = num ? (num.startsWith("56")?num:num.startsWith("9")?`56${num}`:`569${num}`) : "";
-            const msgWA = `Hola ${info.cliente||""}👋\n\nTe adjunto el presupuesto para *${info.descripcion||"tu proyecto"}*.\n\n💰 *Total: $${total.toLocaleString("es-CL")} CLP*${iva?" (IVA inc.)":""}\n\n📄 _(Revisa el PDF adjunto con el detalle completo)_\n\n_${info.empresa||"Obra Nova"}_`;
+            const venceWA = info.fecha ? new Date(new Date(info.fecha).getTime() + (validez||30)*86400000).toLocaleDateString("es-CL") : null;
+            const linkWA = workspaceId && currentId ? `${window.location.origin}/cliente/${workspaceId}/${currentId}` : null;
+            const msgWA = `Hola ${info.cliente||""}👋
+
+Te enviamos el presupuesto para:
+📋 *${info.descripcion||"tu proyecto"}*
+
+💰 *Total: $${total.toLocaleString("es-CL")} CLP*${iva?" (IVA inc.)":""}
+${venceWA?`📅 Válido hasta: *${venceWA}*
+`:""}
+📄 _(Revisa el PDF adjunto con el detalle completo)_${linkWA?`
+
+🔗 También puedes verlo en línea:
+${linkWA}`:""}
+
+_${info.empresa||"Obra Nova"}_`;
             const waUrl = `https://wa.me/${norm}?text=${encodeURIComponent(msgWA)}`;
             return (
               <button
-                onClick={() => { window.print(); onTrackPdf?.("whatsapp"); setTimeout(() => window.open(waUrl,"_blank","noopener,noreferrer"), 800); }}
-                style={{ flex:1,minWidth:140,padding:"11px 14px",background:"#25D366",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
+                onClick={() => { const sb = document.getElementById("app-sidebar"); const prev = sb?.style.display; if (sb) sb.style.display = "none"; window.print(); if (sb) sb.style.display = prev ?? ""; onTrackPdf?.("whatsapp"); setTimeout(() => window.open(waUrl,"_blank","noopener,noreferrer"), 1200); }}
+                style={{ padding:"11px 14px",background:"#25D366",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
                 💬 WA + PDF
               </button>
             );
@@ -136,10 +311,25 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
 
           {/* Solo WhatsApp testo */}
           {info.telefono && (() => {
-            const total = iva ? totals.totalIva : totals.total;
+            const total = iva ? totals.totalIva : totals.totalConDesc;
             const num = (info.telefono||"").replace(/[\s\-\+\(\)]/g,"");
             const norm = num ? (num.startsWith("56")?num:num.startsWith("9")?`56${num}`:`569${num}`) : "";
-            const msgSimple = `Hola ${info.cliente||""}👋\n\nTe enviamos el presupuesto para *${info.descripcion||"tu proyecto"}* por *$${total.toLocaleString("es-CL")} CLP*${iva?" (IVA inc.)":""}.\n\nConsúltanos cualquier duda.\n\n_${info.empresa||"Obra Nova"}_`;
+            const venceSimple = info.fecha ? new Date(new Date(info.fecha).getTime() + (validez||30)*86400000).toLocaleDateString("es-CL") : null;
+            const linkSimple = workspaceId && currentId ? `${window.location.origin}/cliente/${workspaceId}/${currentId}` : null;
+            const msgSimple = `Hola ${info.cliente||""}👋
+
+Te comparto el presupuesto para *${info.descripcion||"tu proyecto"}*:
+
+💰 *Total: $${total.toLocaleString("es-CL")} CLP*${iva?" (IVA incluido)":""}
+${venceSimple?`📅 *Válido hasta: ${venceSimple}*
+`:""}
+${linkSimple?`👉 Revísalo en línea aquí:
+${linkSimple}
+
+`:""}
+¿Tienes alguna consulta? Con gusto te atiendo.
+
+_${info.empresa||"Obra Nova"}_`;
             return (
               <button
                 onClick={() => window.open(`https://wa.me/${norm}?text=${encodeURIComponent(msgSimple)}`,"_blank","noopener,noreferrer")}
@@ -153,7 +343,23 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
           {/* Link vista cliente (para copiar) */}
           {currentId && (
             <button
-              onClick={() => { const url = `${window.location.origin}/firma/${currentId}`; navigator.clipboard?.writeText(url).then(() => {}).catch(()=>{}); window.open(`https://wa.me/?text=${encodeURIComponent(`Hola! Aquí puedes ver tu presupuesto en línea: ${url}`)}`, "_blank"); }}
+              onClick={() => {
+                const url = workspaceId ? `${window.location.origin}/cliente/${workspaceId}/${currentId}` : `${window.location.origin}/firma/${currentId}`;
+                navigator.clipboard?.writeText(url).then(() => {}).catch(()=>{});
+                const totalLink = (iva ? totals?.totalIva : totals?.totalConDesc) || 0;
+                const msgLink = `Hola ${info?.cliente||""}👋
+
+Te enviamos el presupuesto para:
+📋 *${info?.descripcion||"tu proyecto"}*
+
+💰 *Total: $${totalLink.toLocaleString("es-CL")} CLP*${iva?" (IVA inc.)":""}
+
+👉 Ver en línea:
+${url}
+
+_${info?.empresa||"Obra Nova"}_`;
+                window.open(`https://wa.me/?text=${encodeURIComponent(msgLink)}`, "_blank");
+              }}
               style={{ padding:"11px 14px",background:"#553c9a",color:"white",border:"none",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",gap:6 }}
               title="Comparte el link de vista cliente">
               🔗 Link online
@@ -170,19 +376,32 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
 
       {/* Pannello firma digitale */}
       {onInviaFirma && (
-        <div className="no-print" style={{ background: "linear-gradient(135deg,#276749,#38a169)", borderRadius: 12, padding: "14px 18px", marginBottom: 14, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-          <div>
-            <div style={{ color: "white", fontWeight: 700, fontSize: 14 }}>✍️ Firma digitale</div>
-            <div style={{ color: "rgba(255,255,255,.75)", fontSize: 12, marginTop: 2 }}>
-              {firme.length > 0
-                ? `${firme.filter(f => f.stato === "firmato").length} firmato · ${firme.filter(f => f.stato === "pending").length} in attesa`
-                : "Invia il preventivo al cliente per la firma digitale"}
+        <div className="no-print" style={{ background: "linear-gradient(135deg,#276749,#38a169)", borderRadius: 12, padding: "14px 18px", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: "white", fontWeight: 700, fontSize: 14 }}>✍️ Firma digital del cliente</div>
+              <div style={{ color: "rgba(255,255,255,.75)", fontSize: 12, marginTop: 2 }}>
+                {firme.length > 0
+                  ? `${firme.filter(f => f.stato === "firmato").length} firmado · ${firme.filter(f => f.stato === "pending").length} en espera`
+                  : "Envía el presupuesto al cliente para firma digital"}
+              </div>
             </div>
+            <button onClick={onInviaFirma}
+              style={{ padding: "10px 20px", background: "white", color: "#276749", border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", flexShrink: 0 }}>
+              📨 Enviar para firma
+            </button>
           </div>
-          <button onClick={onInviaFirma}
-            style={{ padding: "9px 18px", background: "white", color: "#276749", border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
-            📨 Invia per firma
-          </button>
+          {firme.length > 0 && (
+            <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {firme.slice(0, 3).map((f, i) => (
+                <span key={i} style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99,
+                  background: f.stato === "firmato" ? "rgba(255,255,255,.9)" : "rgba(255,255,255,.3)",
+                  color: f.stato === "firmato" ? "#276749" : "white" }}>
+                  {f.stato === "firmato" ? "✅" : "⏳"} {f.firmaNome || "—"}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -199,7 +418,7 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
                   onClick={() => setCatVisKey(cat, "visible", !cv.visible)}
                   style={{ padding: "3px 9px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, background: cv.visible ? "#276749" : "#e2e8f0", color: cv.visible ? "white" : "#718096" }}
                   aria-label={cv.visible ? t.visCatOcultar : t.visCatMostrar}
-                >{cv.visible ? t.visCatMostrar : t.visCatOcultar}</button>
+                >{cv.visible ? "✓ Visible" : "Oculto"}</button>
                 {cv.visible && (
                   <button
                     onClick={() => setCatVisKey(cat, "modo", cv.modo === "detalle" ? "macro" : "detalle")}
@@ -215,25 +434,26 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
       {/* Print area */}
       <div id="print-area" style={{ background: "white", padding: "28px 24px", maxWidth: 800, margin: "0 auto", borderRadius: 12, boxShadow: "0 1px 8px rgba(0,0,0,.08)", position: "relative", overflow: "hidden" }}>
 
-        {/* ── Watermark OBRA NOVA per piano Free (visibile nell'anteprima app) ── */}
+        {/* ── Watermark OBRA NOVA per piano Free — visibile in anteprima e stampa ── */}
         {!isPro && (
           <div aria-hidden="true" style={{
             position: "absolute", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
             pointerEvents: "none", zIndex: 1, overflow: "hidden",
+            WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
           }}>
             {[0, 1, 2].map(i => (
               <div key={i} style={{
                 position: "absolute",
-                top: `${20 + i * 30}%`,
-                left: "-10%", right: "-10%",
-                transform: "rotate(-35deg)",
-                fontSize: 28, fontWeight: 900,
+                top: `${15 + i * 28}%`,
+                left: "-15%", right: "-15%",
+                transform: "rotate(-32deg)",
+                fontSize: 38, fontWeight: 900,
                 color: "rgba(43,108,176,0.13)",
                 whiteSpace: "nowrap", userSelect: "none",
-                letterSpacing: "0.12em", textTransform: "uppercase",
+                letterSpacing: "0.15em", textTransform: "uppercase",
+                WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
               }}>
-                OBRA NOVA &nbsp;&nbsp; OBRA NOVA &nbsp;&nbsp; OBRA NOVA &nbsp;&nbsp; OBRA NOVA
+                OBRA NOVA &nbsp;&nbsp;&nbsp; OBRA NOVA &nbsp;&nbsp;&nbsp; OBRA NOVA &nbsp;&nbsp;&nbsp; OBRA NOVA &nbsp;&nbsp;&nbsp; OBRA NOVA
               </div>
             ))}
           </div>
@@ -259,7 +479,18 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
         {/* ── Header empresa ── */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20, paddingBottom: 14, borderBottom: `2px solid ${pdf.colorPrimario}22`, marginTop: 8, position: "relative", zIndex: 1 }}>
           <div>
-            <img src={logoEffettivo} alt="" style={{ height: 46, marginBottom: 6, maxWidth: 180, objectFit: "contain" }} onError={e => { e.target.style.display = "none"; }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <img src={logoEffettivo} alt="" style={{ height: 46, maxWidth: 180, objectFit: "contain" }} onError={e => { e.target.style.display = "none"; }} />
+              {showFreeBranding && (
+                <span style={{
+                  fontSize: 8, fontWeight: 800, color: "#2b6cb0",
+                  background: "#ebf8ff", border: "1px solid #bee3f8",
+                  borderRadius: 4, padding: "2px 6px", letterSpacing: .5,
+                  alignSelf: "flex-start", marginTop: 4,
+                  WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+                }}>OBRA NOVA FREE</span>
+              )}
+            </div>
             <div style={{ fontWeight: 800, fontSize: 17, color: pdf.colorPrimario }}>{EMPRESA.nombre}</div>
             <div style={{ fontSize: 10, color: "#718096", marginTop: 2 }}>RUT {EMPRESA.rut} · {EMPRESA.giro}</div>
             <div style={{ fontSize: 10, color: "#718096" }}>{EMPRESA.direccion}, {EMPRESA.ciudad} · 📞 {EMPRESA.telefono}</div>
@@ -276,13 +507,49 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
             </div>
             <div style={{ fontSize: 11, color: "#4a5568" }}>📅 {info.fecha || new Date().toLocaleDateString("es-CL")}</div>
             <div style={{ fontSize: 10, color: "#718096" }}>Vence: <strong>{venceDate}</strong></div>
-            {/* QR link firma/vista */}
+            {/* QR code — visibile in stampa, porta alla VistaCliente firmabile */}
+            {currentId && workspaceId && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, marginTop: 4 }}>
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(`${window.location.origin}/cliente/${workspaceId}/${currentId}`)}&bgcolor=ffffff&color=1a365d&qzone=1`}
+                  alt="QR presupuesto"
+                  width={80}
+                  height={80}
+                  style={{ borderRadius: 6, border: "1px solid #e2e8f0", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
+                />
+                <span style={{ fontSize: 8, color: "#a0aec0", letterSpacing: 0.3 }}>Escanea para firmar</span>
+              </div>
+            )}
+            {/* Bottone link cliente */}
             {currentId && (
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=64x64&data=${encodeURIComponent(window.location.origin + "/firma/" + currentId)}`}
-                alt="QR"
-                style={{ width: 60, height: 60, borderRadius: 6, border: "1px solid #e2e8f0", marginTop: 4 }}
-              />
+              <button
+                onClick={() => {
+                  const url = workspaceId ? `${window.location.origin}/cliente/${workspaceId}/${currentId}` : `${window.location.origin}/firma/${currentId}`;
+                  navigator.clipboard?.writeText(url).then(() => {}).catch(() => {});
+                  const totalEnviar = (iva ? totals?.totalIva : totals?.totalConDesc) || 0;
+                  const clienteEnviar = info?.cliente || "";
+                  const descEnviar = info?.descripcion || "tu proyecto";
+                  const empresaEnviar = info?.empresa || "Obra Nova";
+                  const venceEnviar = info?.fecha ? new Date(new Date(info.fecha).getTime() + (validez||30)*86400000).toLocaleDateString("es-CL") : null;
+                  const msgEnviar = `Hola ${clienteEnviar}👋
+
+Te enviamos el presupuesto para:
+📋 *${descEnviar}*
+
+💰 *Total: $${totalEnviar.toLocaleString("es-CL")} CLP*${iva?" (IVA inc.)":""}
+${venceEnviar?`📅 Válido hasta: *${venceEnviar}*
+`:""}
+👉 Ver, revisar y firmar en línea:
+${url}
+
+_${empresaEnviar}_`;
+                  window.open(`https://wa.me/?text=${encodeURIComponent(msgEnviar)}`, "_blank");
+                }}
+                className="no-print"
+                style={{ marginTop: 6, padding: "7px 14px", background: "#25D366", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 11, display: "flex", alignItems: "center", gap: 5 }}
+              >
+                💬 Enviar al cliente
+              </button>
             )}
           </div>
         </div>
@@ -308,7 +575,7 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
           {cats.map((cat, ci) => {
             const cv = getCatVis(cat);
             if (!cv.visible) return null;
-            const vis = partidas.filter(p => p.cat === cat && p.visible && p.cant * p.pu > 0);
+            const vis = partidas.filter(p => p.cat === cat && p.visible !== false && p.cant * p.pu > 0);
             if (!vis.length) return null;
             const catTotal = vis.reduce((s, p) => s + p.cant * p.pu, 0);
             const catColor = CC[ci % CC.length];
@@ -346,29 +613,72 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
         {/* Resumen financiero */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 18, position: "relative", zIndex: 1 }}>
           <div style={{ background: "#f7fafc", borderRadius: 9, padding: "12px 14px", fontSize: 11 }}>
-            <div style={{ fontWeight: 700, marginBottom: 7, color: "#1a365d", fontSize: 12 }}>{t.desgloseFinanciero}</div>
-            {[
-              [`CI ${pct.ci}%`, ci], [`GF ${pct.gf}%`, gf],
-              [`Imprevistos ${pct.imprevistos}%`, imprev],
-              [t.subtotal || "Subtotal", sub, true],
-              [`${t.utilidad} ${pct.utilidad}%`, util],
-              ["TOTAL s/IVA", total, true],
-            ].map(([l, v, b]) => (
-              <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderTop: b ? "1px solid #e2e8f0" : "none", fontWeight: b ? 700 : 400 }}>
-                <span style={{ color: b ? "#1a365d" : "#718096" }}>{l}</span>
-                <span style={{ color: b ? "#1a365d" : "#4a5568" }}>{fmt(v)}</span>
-              </div>
-            ))}
-            {iva && <>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 0" }}>
-                <span style={{ color: "#c05621" }}>IVA 19%</span>
-                <span style={{ color: "#c05621" }}>{fmt(ivaAmt)}</span>
-              </div>
+            {(() => {
+              const hasDesc = (descuentoAmt || 0) > 0;
+              const vcRows = [
+                { key:"ci",     l:`CI ${pct.ci}%`,                    v:ci,      b:false },
+                { key:"gf",     l:`GF ${pct.gf}%`,                    v:gf,      b:false },
+                { key:"imprev", l:`Imprevistos ${pct.imprevistos}%`,   v:imprev,  b:false },
+                { key:"sub",    l:t.subtotal || "Subtotal",            v:sub,     b:true  },
+                { key:"util",   l:`${t.utilidad} ${pct.utilidad}%`,    v:util,    b:false },
+                { key:"total",  l:hasDesc ? "Total s/desc." : "TOTAL s/IVA", v:total, b:true },
+                ...(hasDesc ? [
+                  { key:"desc",  l:`Descuento${descuento.tipo==="pct"?` (${descuento.valor}% s/neto)`:""}`, v:-descuentoAmt, b:false, red:true },
+                  { key:"totalcd",l:"TOTAL c/desc.",                    v:totalConDesc, b:true },
+                ] : []),
+              ];
+              const toggleable = vcRows.filter(r=>!r.b);
+              const allHid = toggleable.every(r=>hidVC[r.key]);
+              return <>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:7 }}>
+                  <span style={{ fontWeight:700, color:"#1a365d", fontSize:12 }}>{t.desgloseFinanciero || "Desglose financiero"}</span>
+                  <button className="no-print" onClick={()=>{ const n={}; if(!allHid) toggleable.forEach(r=>{n[r.key]=true;}); setHidVC(n); localStorage.setItem("on_desglose_vc_hidden",JSON.stringify(n)); }} style={{ fontSize:10, color:"#718096", background:"white", border:"1px solid #e2e8f0", borderRadius:5, padding:"2px 6px", cursor:"pointer" }}>{allHid?"Mostrar":"Ocultar"}</button>
+                </div>
+                {vcRows.map(({key,l,v,b,red}) => {
+                  const isHid = hidVC[key] && !b;
+                  // Hidden rows: don't render at all (clean PDF)
+                  if (isHid) return null;
+                  return (
+                    <div key={key} style={{ display:"flex", alignItems:"center", gap:5, padding:"3px 0", borderTop: b ? "1px solid #e2e8f0" : "none" }}>
+                      <input type="checkbox" className="no-print" checked={!hidVC[key]} onChange={()=>toggleVC(key)}
+                        style={{ width:12, height:12, accentColor:"#2b6cb0", cursor:"pointer", margin:0, flexShrink:0 }}
+                        disabled={b} />
+                      <span style={{ flex:1, color: red ? "#e53e3e" : b ? "#1a365d" : "#718096", fontWeight: b ? 700 : 400 }}>{l}</span>
+                      <span style={{ color: red ? "#e53e3e" : b ? "#1a365d" : "#4a5568", fontWeight: b ? 700 : 400 }}>{fmt(v)}</span>
+                    </div>
+                  );
+                })}
+                {/* IVA row — toggleable */}
+                {iva && (() => {
+                  const ivaHid = hidVC["iva_vc"];
+                  if (ivaHid) return null;
+                  return (
+                    <div style={{ display:"flex", alignItems:"center", gap:5, padding:"3px 0", borderTop:"1px solid #e2e8f0" }}>
+                      <input type="checkbox" className="no-print" checked={!ivaHid} onChange={()=>toggleVC("iva_vc")}
+                        style={{ width:12, height:12, accentColor:"#2b6cb0", cursor:"pointer", margin:0, flexShrink:0 }} />
+                      <span style={{ flex:1, color:"#c05621" }}>IVA 19%</span>
+                      <span style={{ color:"#c05621" }}>{fmt(ivaAmt)}</span>
+                    </div>
+                  );
+                })()}
+                {/* Descuento descripción */}
+                {hasDesc && descuento.descripcion && !hidVC["desc"] && (
+                  <div style={{ fontSize:10, color:"#718096", fontStyle:"italic", padding:"2px 0 0 17px" }}>{descuento.descripcion}</div>
+                )}
+              </>;
+            })()}
+            {/* TOTAL finale — sempre visibile */}
+            {iva && !hidVC["iva_vc"] ? (
               <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 10px", background: "#1a365d", borderRadius: 7, marginTop: 5 }}>
                 <span style={{ color: "white", fontWeight: 800, fontSize: 13 }}>TOTAL {t.conIVA}</span>
                 <span style={{ color: "white", fontWeight: 900, fontSize: 13 }}>{fmt(totalIva)}</span>
               </div>
-            </>}
+            ) : !iva ? (
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 10px", background: "#1a365d", borderRadius: 7, marginTop: 5 }}>
+                <span style={{ color: "white", fontWeight: 800, fontSize: 13 }}>TOTAL</span>
+                <span style={{ color: "white", fontWeight: 900, fontSize: 13 }}>{fmt(totalConDesc)}</span>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -376,14 +686,54 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
         {pdf.mostraCondPago && info.condPago && (
           <div className="print-block" style={{ marginBottom:16,padding:"12px 16px",background:"#f7fafc",borderRadius:9,border:`1px solid ${pdf.colorPrimario}22` }}>
             <div style={{ fontWeight:700,fontSize:12,color:pdf.colorPrimario,marginBottom:6 }}>💳 Condiciones de pago</div>
-            <div style={{ fontSize:12,color:"#4a5568" }}>
-              {info.condPago === "personalizado" ? (info.condPagoPersonalizado || "—") : info.condPago}
-            </div>
-            {info.cuotas && info.cuotas.length > 0 && (
-              <div style={{ marginTop:8,display:"flex",flexWrap:"wrap",gap:6 }}>
+
+            {info.condPago === "contado" && (
+              <div style={{ fontSize:12,color:"#4a5568" }}>💵 Pago al contado</div>
+            )}
+
+            {(info.condPago === "credito" || info.condPago === "personalizado") && (
+              <div style={{ fontSize:12,color:"#4a5568" }}>{info.condPagoPersonalizado || "—"}</div>
+            )}
+
+            {info.condPago === "transferencia" && info.transferencia && (
+              <div style={{ display:"flex",flexDirection:"column",gap:4 }}>
+                <div style={{ fontSize:12,color:"#4a5568",fontWeight:700,marginBottom:4 }}>🏧 Datos para transferencia</div>
+                {info.transferencia.banco      && <div style={{ fontSize:12,color:"#4a5568" }}><strong>Banco:</strong> {info.transferencia.banco}</div>}
+                {info.transferencia.cuenta     && <div style={{ fontSize:12,color:"#4a5568" }}><strong>N° Cuenta:</strong> {info.transferencia.cuenta}</div>}
+                {info.transferencia.rutTitular && <div style={{ fontSize:12,color:"#4a5568" }}><strong>RUT Titular:</strong> {info.transferencia.rutTitular}</div>}
+                {info.transferencia.nota       && <div style={{ fontSize:12,color:"#718096",marginTop:4,fontStyle:"italic" }}>{info.transferencia.nota}</div>}
+              </div>
+            )}
+
+            {info.condPago === "cuotas" && info.cuotas && info.cuotas.length > 0 && (
+              <div style={{ marginTop:8,display:"flex",flexDirection:"column",gap:6 }}>
                 {info.cuotas.map((c,i) => (
-                  <div key={i} style={{ padding:"4px 10px",background:"white",borderRadius:7,fontSize:11,border:`1px solid ${pdf.colorPrimario}33`,color:"#2d3748" }}>
-                    <strong>Cuota {i+1}:</strong> {c.pct}% — {c.desc}
+                  <div key={i} style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"6px 10px",background:"white",borderRadius:7,border:`1px solid ${pdf.colorPrimario}33` }}>
+                    <div style={{ display:"flex",flexDirection:"column",gap:1 }}>
+                      <span style={{ fontSize:12,fontWeight:700,color:"#2d3748" }}>
+                        {c.desc || `Cuota ${i+1}`}
+                      </span>
+                      <span style={{ fontSize:11,color:"#718096" }}>
+                        {(c.tipo || "pct") === "pct"
+                          ? `${c.monto || 0}% del total`
+                          : `$${(c.monto || 0).toLocaleString("es-CL")}`
+                        }
+                        {c.fecha ? ` · Vence ${new Date(c.fecha + "T12:00:00").toLocaleDateString("es-CL")}` : ""}
+                      </span>
+                    </div>
+                    {c.mpLink && (
+                      <div style={{ display:"flex",alignItems:"center",gap:8,flexShrink:0,marginLeft:10 }}>
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=52x52&data=${encodeURIComponent(c.mpLink)}&bgcolor=ffffff&color=009ee3&qzone=1`}
+                          alt="QR pago"
+                          style={{ width:52,height:52,borderRadius:4,border:"1px solid #e2e8f0" }}
+                        />
+                        <a href={c.mpLink} target="_blank" rel="noopener noreferrer"
+                          style={{ padding:"5px 12px",background:"#009ee3",color:"white",borderRadius:7,fontSize:11,fontWeight:700,textDecoration:"none" }}>
+                          💳 Pagar online
+                        </a>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -402,6 +752,27 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
                   {foto.descripcion && <div style={{ fontSize:9,color:"#718096",padding:"3px 6px",background:"#f7fafc" }}>{foto.descripcion}</div>}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Renders AI del proyecto */}
+        {aiRenders && aiRenders.length > 0 && (
+          <div className="print-block" style={{ marginBottom:16 }}>
+            <div style={{ fontWeight:700,fontSize:12,color:pdf.colorPrimario,marginBottom:8,borderBottom:`1px solid ${pdf.colorPrimario}22`,paddingBottom:5 }}>🎨 Visualización AI del proyecto</div>
+            <div style={{ display:"grid",gridTemplateColumns: aiRenders.length === 1 ? "1fr" : "repeat(auto-fill,minmax(220px,1fr))",gap:10 }}>
+              {aiRenders.slice(0,4).map((r,i) => (
+                <div key={i} style={{ borderRadius:8,overflow:"hidden",border:"1px solid #e2e8f0",boxShadow:"0 1px 4px rgba(0,0,0,.06)" }}>
+                  <img src={r.imageUrl} alt={r.label || `Render ${i+1}`} style={{ width:"100%",height: aiRenders.length === 1 ? 280 : 160,objectFit:"cover",display:"block" }} />
+                  <div style={{ padding:"5px 8px",background:"#f7fafc",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                    <span style={{ fontSize:10,fontWeight:700,color:"#1a365d" }}>{r.label || r.roomType || `Render ${i+1}`}</span>
+                    <span style={{ fontSize:9,color:"#a0aec0" }}>Render AI</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize:9,color:"#a0aec0",marginTop:6,textAlign:"center",fontStyle:"italic" }}>
+              Visualización generada por inteligencia artificial — el resultado final puede variar
             </div>
           </div>
         )}
@@ -456,23 +827,66 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
 
           {/* Watermark Free / branding Pro */}
           {!isPro ? (
-            <div style={{ marginTop: 16, paddingTop: 10, borderTop: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, opacity: .5 }}>
-              <img src={LOGO_URL} alt="Obra Nova" style={{ height: 20, objectFit: "contain" }} onError={e => { e.target.style.display = "none"; }} />
-              <span style={{ fontSize: 10, color: "#a0aec0", fontWeight: 600 }}>Generado con Obra Nova SPA · obranovaspa.cl</span>
+            <div className="print-footer" style={{
+              marginTop: 14, paddingTop: 10,
+              borderTop: "2px solid #bee3f8",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              flexWrap: "wrap", gap: 8,
+              background: "#f0f8ff", borderRadius: 8, padding: "10px 14px",
+              WebkitPrintColorAdjust: "exact", printColorAdjust: "exact",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <img src={LOGO_URL} alt="Obra Nova" style={{ height: 22, objectFit: "contain" }} onError={e => { e.target.style.display = "none"; }} />
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "#2b6cb0" }}>Generado con Obra Nova Free</div>
+                  <div style={{ fontSize: 8, color: "#718096" }}>app.obranova.cl — Sistema de presupuestos para construcción</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 8, color: "#2b6cb0", fontWeight: 700, textAlign: "right" }}>
+                Mejora a Pro para PDF<br/>con tu logo y sin branding
+              </div>
             </div>
           ) : (
-            <div style={{ marginTop: 12, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, opacity: .4 }}>
-              <img src={LOGO_URL} alt="" style={{ height: 16, objectFit: "contain" }} onError={e => { e.target.style.display = "none"; }} />
-              <span style={{ fontSize: 9, color: "#a0aec0" }}>Obra Nova Pro</span>
+            <div className="print-footer" style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 5, opacity: .3 }}>
+              <img src={LOGO_URL} alt="" style={{ height: 14, objectFit: "contain" }} onError={e => { e.target.style.display = "none"; }} />
+              <span style={{ fontSize: 8, color: "#a0aec0" }}>Obra Nova</span>
             </div>
           )}
+        </div>
+
+        {/* ── Nova para el cliente — preguntas frecuentes ─────────────────── */}
+        <div className="no-print" style={{ marginTop: 16, background: "linear-gradient(135deg,#ebf8ff,#bee3f8)", borderRadius: 12, padding: "14px 16px", border: "1px solid #90cdf4" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ fontSize: 18 }}>🤖</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d" }}>Nova — Asistente del presupuesto</div>
+              <div style={{ fontSize: 11, color: "#4a5568" }}>Preguntas frecuentes sobre este presupuesto</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {[
+              { q: "¿Este precio es justo?", a: `Este presupuesto de ${totals.totalConDesc > 0 ? "$" + Math.round(iva ? totals.totalIva : totals.totalConDesc).toLocaleString("es-CL") : "—"} CLP está dentro del rango de mercado para este tipo de trabajo en Chile. Los precios unitarios reflejan valores actualizados 2026.` },
+              { q: "¿Qué incluye exactamente?", a: `Incluye ${partidas.length} partidas organizadas en ${[...new Set(partidas.map(p => p.cat).filter(Boolean))].length} categorías: ${[...new Set(partidas.map(p => p.cat).filter(Boolean))].slice(0, 4).join(", ")}${[...new Set(partidas.map(p => p.cat).filter(Boolean))].length > 4 ? " y más" : ""}.` },
+              { q: "¿Cuánto tiempo toma?", a: "El plazo depende del alcance del proyecto. Consulta directamente con el constructor para un cronograma detallado." },
+            ].map((item, i) => (
+              <details key={i} style={{ background: "white", borderRadius: 8, border: "1px solid #bee3f8", overflow: "hidden" }}>
+                <summary style={{ padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#2a4365", cursor: "pointer", listStyle: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 14 }}>💬</span> {item.q}
+                </summary>
+                <div style={{ padding: "8px 12px", fontSize: 12, color: "#4a5568", lineHeight: 1.5, borderTop: "1px solid #bee3f8", background: "#f7fafc" }}>
+                  {item.a}
+                </div>
+              </details>
+            ))}
+          </div>
+          <div style={{ fontSize: 9, color: "#718096", marginTop: 8, textAlign: "center" }}>
+            Respuestas generadas por Nova AI — para más detalles contacta al constructor
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
-// ─── TabProyectos ─────────────────────────────────────────────────────────────
 
 function ProyectoCard({ p, isActive, onLoad, onDelete, onPDF, t }) {
   const ptot = calcProjectTotal(p);
@@ -534,6 +948,12 @@ function ProyectoCard({ p, isActive, onLoad, onDelete, onPDF, t }) {
           userSelect: "none", WebkitUserSelect: "none",
         }}
       >
+        {/* Immagine portada render AI */}
+        {p.coverImageUrl && (
+          <div style={{ margin:"-14px -16px 12px -16px", borderRadius:"14px 14px 0 0", overflow:"hidden", height:100 }}>
+            <img src={p.coverImageUrl} alt="Portada" style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }} />
+          </div>
+        )}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 15, color: "#1a365d", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -561,6 +981,8 @@ function ProyectoCard({ p, isActive, onLoad, onDelete, onPDF, t }) {
     </div>
   );
 }
+
+// ─── TabProyectos ─────────────────────────────────────────────────────────────
 
 export function TabProyectos({ proyectos, currentId, onLoad, onDelete, onPDF, t, canPlan, onPaywall }) {
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768);
@@ -645,7 +1067,7 @@ export function TabProyectos({ proyectos, currentId, onLoad, onDelete, onPDF, t,
       {/* Riga 3: risultati summary */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 11, color: "#a0aec0", fontWeight: 600 }}>
-          {filtered.length} de {proyectos.length} proyectos
+          {filtered.length} de {proyectos.length} cotizaciones
         </span>
         <span style={{ fontSize: 12, fontWeight: 700, color: "#276749" }}>
           Total filtrado: {fmt(totalMonto)}
@@ -660,7 +1082,7 @@ export function TabProyectos({ proyectos, currentId, onLoad, onDelete, onPDF, t,
       <div style={{ background: "white", borderRadius: 16, padding: "60px 24px", textAlign: "center", boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
         <div style={{ fontSize: 56, marginBottom: 14 }}>📁</div>
         <div style={{ fontWeight: 800, fontSize: 18, color: "#1a365d", marginBottom: 8 }}>
-          Aún no tienes proyectos
+          Aún no tienes cotizaciones
         </div>
         <div style={{ fontSize: 14, color: "#718096", maxWidth: 300, margin: "0 auto 28px", lineHeight: 1.6 }}>
           Crea tu primer presupuesto y envíaselo al cliente en menos de 5 minutos
@@ -890,13 +1312,79 @@ function ComparativoProveedores({ listino, cats, catColors, t }) {
   );
 }
 
-export function TabListino({ listino, cats, catColors, newCatName, setNewCatName, onAddCat, onDeleteItem, onAddFromListino, onOpenAddModal, DEFAULT_CATS, t, onUpdatePrecio, listinoRestanti = Infinity, onPaywall = () => {}, isPro = false }) {
+export function TabListino({ listino, cats, catColors, newCatName, setNewCatName, onAddCat, onDeleteItem, onAddFromListino, onOpenAddModal, onSaveListinoItem, DEFAULT_CATS, t, onUpdatePrecio, listinoRestanti = Infinity, onPaywall = () => {}, isPro = false }) {
   const [filterCat,    setFilterCat]    = useState(null);
   const [search,       setSearch]       = useState("");
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768);
   const [vistaTab,     setVistaTab]     = useState("listino"); // "listino" | "comparativo"
   // 2.10 Edit inline prezzi
   const [editingPrice, setEditingPrice] = useState(null); // { id, field, value }
+  // Modal agregar/editar listino
+  const [showModal, setShowModal] = useState(false); // "add" | item.id | false
+  const [modalForm, setModalForm] = useState({ nombre: "", cat: cats[0] || "", unidad: "un", precioCompra: 0, precioCliente: 0, proveedor: "" });
+  const [showProvSugg, setShowProvSugg] = useState(false);
+
+  // Proveedores aggregati da tutti gli items del listino
+  const proveedores = useMemo(() => {
+    const set = new Set();
+    listino.forEach(x => { if (x.proveedor?.trim()) set.add(x.proveedor.trim()); });
+    return [...set].sort();
+  }, [listino]);
+
+  const provSuggFiltered = useMemo(() => {
+    if (!modalForm.proveedor?.trim()) return proveedores;
+    const q = modalForm.proveedor.toLowerCase();
+    return proveedores.filter(p => p.toLowerCase().includes(q));
+  }, [proveedores, modalForm.proveedor]);
+
+  const isEditing = showModal && showModal !== "add";
+
+  const handleModalSave = async () => {
+    if (!modalForm.nombre.trim()) return;
+    if (onSaveListinoItem) {
+      const payload = {
+        nombre: modalForm.nombre.trim(),
+        cat: modalForm.cat,
+        unidad: modalForm.unidad,
+        precioCompra: parseFloat(modalForm.precioCompra) || 0,
+        precio: parseFloat(modalForm.precioCompra) || 0,
+        precioVenta: parseFloat(modalForm.precioCliente) || 0,
+        precioCliente: parseFloat(modalForm.precioCliente) || 0,
+        proveedor: modalForm.proveedor.trim(),
+      };
+      if (isEditing) {
+        // Edit: update via onUpdatePrecio for each field
+        const item = listino.find(x => x.id === showModal);
+        if (item && onUpdatePrecio) {
+          for (const [k, v] of Object.entries(payload)) {
+            if (item[k] !== v) await onUpdatePrecio(item.id, k, v);
+          }
+        }
+      } else {
+        await onSaveListinoItem(payload);
+      }
+    }
+    setModalForm({ nombre: "", cat: cats[0] || "", unidad: "un", precioCompra: 0, precioCliente: 0, proveedor: "" });
+    setShowModal(false);
+  };
+
+  const openAddModal = () => {
+    if (listinoRestanti === 0) { onPaywall("maxListino"); return; }
+    setModalForm({ nombre: "", cat: cats[0] || "", unidad: "un", precioCompra: 0, precioCliente: 0, proveedor: "" });
+    setShowModal("add");
+  };
+
+  const openEditModal = (item) => {
+    setModalForm({
+      nombre: item.nombre || "",
+      cat: item.cat || cats[0] || "",
+      unidad: item.unidad || "un",
+      precioCompra: item.precioCompra || 0,
+      precioCliente: item.precioCliente || item.precio || 0,
+      proveedor: item.proveedor || "",
+    });
+    setShowModal(item.id);
+  };
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", h);
@@ -949,7 +1437,7 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
             </button>
           ))}
         </div>
-        <button onClick={() => listinoRestanti === 0 ? onPaywall("maxListino") : onOpenAddModal()}
+        <button onClick={openAddModal}
           style={{ padding: "8px 16px", background: "#276749", color: "white", border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
           {t.listinoAgregar}
         </button>
@@ -1052,11 +1540,11 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input value={newCatName} onChange={e => setNewCatName(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && onAddCat()}
+              onKeyDown={e => { if (e.key === "Enter" && newCatName.trim()) { onAddCat(newCatName.trim()); setNewCatName(""); } }}
               placeholder={t.catNombrePlaceholder} aria-label={t.catAgregar}
               style={{ flex: 1, padding: "8px 11px", border: "2px solid #e2e8f0", borderRadius: 8, fontSize: 13, color: "#1a365d" }}
             />
-            <button onClick={onAddCat}
+            <button onClick={() => { if (newCatName.trim()) { onAddCat(newCatName.trim()); setNewCatName(""); } }}
               style={{ padding: "8px 14px", background: "#2b6cb0", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap" }}>
               {t.catAgregar}
             </button>
@@ -1066,9 +1554,20 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
 
       {/* Lista */}
       {listino.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "50px 0", color: "#a0aec0", background: "white", borderRadius: 12 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>📦</div>
-          <div>{t.listinoVacio}</div>
+        <div style={{ textAlign: "center", padding: "50px 24px", color: "#a0aec0", background: "white", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
+          <div style={{ fontWeight: 800, fontSize: 16, color: "#1a365d", marginBottom: 8 }}>Tu lista de precios está vacía</div>
+          <div style={{ fontSize: 13, color: "#718096", maxWidth: 280, margin: "0 auto 20px", lineHeight: 1.6 }}>
+            Agrega materiales con sus precios y proveedores para usarlos en cualquier presupuesto con un clic
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 16 }}>
+            {["💰 Precio por unidad", "🏭 Proveedor", "📋 Insertar en partida"].map((s, i) => (
+              <div key={i} style={{ background: "#ebf8ff", border: "1px solid #bee3f8", borderRadius: 8, padding: "6px 12px", fontSize: 11, color: "#2b6cb0", fontWeight: 600 }}>
+                {i + 1}. {s}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: "#a0aec0" }}>👆 Usa <strong>+ Agregar ítem</strong> para empezar</div>
         </div>
       ) : listinoFiltrato.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 0", color: "#a0aec0", background: "white", borderRadius: 12 }}>
@@ -1114,6 +1613,8 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
                   <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
                     <button onClick={() => onAddFromListino(item)}
                       style={{ padding: "6px 10px", background: "#ebf8ff", border: "1px solid #bee3f8", borderRadius: 7, cursor: "pointer", color: "#2b6cb0", fontSize: 12, fontWeight: 700 }}>+</button>
+                    <button onClick={() => openEditModal(item)}
+                      style={{ padding: "6px 8px", background: "#fffff0", border: "1px solid #fefcbf", borderRadius: 7, cursor: "pointer", color: "#b7791f", fontSize: 11 }}>✏️</button>
                     <button onClick={() => onDeleteItem(item.id)}
                       style={{ padding: "6px 8px", background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: 7, cursor: "pointer", color: "#c53030", fontSize: 11 }}>✕</button>
                   </div>
@@ -1225,6 +1726,9 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
                               borderRadius: 7, cursor: "pointer", color: "#2b6cb0", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>
                             + {t.costos || "Usar"}
                           </button>
+                          <button onClick={() => openEditModal(item)} aria-label="Editar"
+                            style={{ padding: "4px 8px", background: "#fffff0", border: "1px solid #fefcbf",
+                              borderRadius: 7, cursor: "pointer", color: "#b7791f", fontSize: 11 }}>✏️</button>
                           <button onClick={() => onDeleteItem(item.id)} aria-label="Eliminar"
                             style={{ padding: "4px 8px", background: "#fff5f5", border: "1px solid #fed7d7",
                               borderRadius: 7, cursor: "pointer", color: "#c53030", fontSize: 11 }}>✕</button>
@@ -1240,23 +1744,105 @@ export function TabListino({ listino, cats, catColors, newCatName, setNewCatName
         </div>
       )}
       </>)}{/* fine vistaTab === listino */}
+
+      {/* ── Modal Agregar / Editar Listino ────────────────────────────────── */}
+      {showModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
+          <div style={{ background:"white", borderRadius:14, padding:24, width:"100%", maxWidth:440, boxShadow:"0 8px 32px rgba(0,0,0,.2)" }}>
+            <div style={{ fontWeight:800, fontSize:16, color:"#1a365d", marginBottom:16 }}>
+              {isEditing ? "✏️ Editar item" : "➕ Agregar al listino"}
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              <div>
+                <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>Nombre *</label>
+                <input value={modalForm.nombre} onChange={e => setModalForm(f => ({ ...f, nombre: e.target.value }))}
+                  placeholder="Ej: Cemento 25kg" autoFocus
+                  style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box" }} />
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>Categoría</label>
+                  <select value={modalForm.cat} onChange={e => setModalForm(f => ({ ...f, cat: e.target.value }))}
+                    style={{ width:"100%", padding:"9px 10px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:12 }}>
+                    {cats.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div style={{ width:90 }}>
+                  <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>Unidad</label>
+                  <select value={modalForm.unidad} onChange={e => setModalForm(f => ({ ...f, unidad: e.target.value }))}
+                    style={{ width:"100%", padding:"9px 10px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:12 }}>
+                    {["un","m²","m³","ml","kg","gl","hr","saco","bolsa","rollo","lt"].map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>Precio compra</label>
+                  <input type="number" min="0" value={modalForm.precioCompra || ""} placeholder="$0"
+                    onChange={e => setModalForm(f => ({ ...f, precioCompra: e.target.value }))}
+                    style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box", textAlign:"right" }} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>Precio cliente</label>
+                  <input type="number" min="0" value={modalForm.precioCliente || ""} placeholder="$0"
+                    onChange={e => setModalForm(f => ({ ...f, precioCliente: e.target.value }))}
+                    style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box", textAlign:"right" }} />
+                </div>
+              </div>
+              {/* Proveedor con autocomplete */}
+              <div style={{ position:"relative" }}>
+                <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>
+                  Proveedor {proveedores.length > 0 && <span style={{ color:"#a0aec0", fontWeight:400 }}>({proveedores.length} guardados)</span>}
+                </label>
+                <input value={modalForm.proveedor}
+                  onChange={e => { setModalForm(f => ({ ...f, proveedor: e.target.value })); setShowProvSugg(true); }}
+                  onFocus={() => setShowProvSugg(true)}
+                  onBlur={() => setTimeout(() => setShowProvSugg(false), 150)}
+                  placeholder="Escribe o selecciona un proveedor"
+                  style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box" }} />
+                {showProvSugg && provSuggFiltered.length > 0 && (
+                  <div style={{ position:"absolute", top:"100%", left:0, right:0, background:"white", border:"1.5px solid #e2e8f0", borderTop:"none", borderRadius:"0 0 8px 8px", maxHeight:150, overflowY:"auto", zIndex:10, boxShadow:"0 4px 12px rgba(0,0,0,.1)" }}>
+                    {provSuggFiltered.map(p => (
+                      <div key={p}
+                        onMouseDown={() => { setModalForm(f => ({ ...f, proveedor: p })); setShowProvSugg(false); }}
+                        style={{ padding:"8px 12px", cursor:"pointer", fontSize:12, color:"#2d3748", borderBottom:"1px solid #f7fafc" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#ebf8ff"}
+                        onMouseLeave={e => e.currentTarget.style.background = "white"}>
+                        🏭 {p}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:8, marginTop:18, justifyContent:"flex-end" }}>
+              <button onClick={() => setShowModal(false)}
+                style={{ padding:"9px 18px", border:"1px solid #e2e8f0", borderRadius:8, background:"white", color:"#718096", cursor:"pointer", fontWeight:600, fontSize:13 }}>
+                Cancelar
+              </button>
+              <button onClick={handleModalSave} disabled={!modalForm.nombre.trim()}
+                style={{ padding:"9px 22px", border:"none", borderRadius:8, background: modalForm.nombre.trim() ? "#276749" : "#e2e8f0", color: modalForm.nombre.trim() ? "white" : "#a0aec0", cursor: modalForm.nombre.trim() ? "pointer" : "default", fontWeight:700, fontSize:13 }}>
+                {isEditing ? "Guardar cambios" : "Agregar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 
 // ─── TabStorico ───────────────────────────────────────────────────────────────
-export function TabStorico({ proyectos, t, canPlan, onPaywall }) {
+export function TabStorico({ proyectos, t, isPro = false, filterByHistorial, onPaywall }) {
   const [search, setSearch] = useState("");
 
-  // 4.1 Filtra storico per piano: Free = ultimi 60gg, Pro = illimitato
+  // Filtra storico per piano: Free = ultimi 30gg (da usePlan), Pro = illimitato
   const proyectosFiltrati = useMemo(() => {
-    if (!canPlan || canPlan("historialDays") !== false) return proyectos;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 60);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
-    return proyectos.filter(p => (p.info?.fecha || p.updatedAt || "") >= cutoffStr);
-  }, [proyectos, canPlan]);
+    if (isPro || !filterByHistorial) return proyectos;
+    return filterByHistorial(proyectos, p => p.info?.fecha || p.updatedAt || "");
+  }, [proyectos, isPro, filterByHistorial]);
 
   const storicoMat = useMemo(() => Object.values(
     proyectosFiltrati.reduce((acc, proj) => {
@@ -1275,7 +1861,7 @@ export function TabStorico({ proyectos, t, canPlan, onPaywall }) {
       return acc;
     }, {})
   ).map(m => ({ ...m, projs: Array.from(m.projs), compras: m.compras.slice(-5).reverse() }))
-   .sort((a, b) => b.cantTotal - a.cantTotal).slice(0, 60), [proyectos, t]);
+   .sort((a, b) => b.cantTotal - a.cantTotal).slice(0, 60), [proyectosFiltrati, t]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return storicoMat;
@@ -1293,15 +1879,15 @@ export function TabStorico({ proyectos, t, canPlan, onPaywall }) {
         <div style={{ color: "#a0aec0", fontSize: 12 }}>{t.storicoDesc}</div>
       </div>
       {/* 4.1 Banner storico limitato nel Free */}
-      {canPlan && !canPlan("historialDays") && (
+      {!isPro && (
         <div style={{ background: "#fffff0", border: "1px solid #f6e05e", borderRadius: 10, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 18 }}>⏳</span>
             <span style={{ fontSize: 12, color: "#744210", fontWeight: 700 }}>
-              Plan Free — histórico limitado a los últimos 60 días
+              Plan Free — histórico limitado a los últimos 30 días
             </span>
           </div>
-          <button onClick={() => onPaywall?.("historialDays")}
+          <button onClick={() => onPaywall?.("maxProyectos")}
             style={{ padding: "5px 14px", background: "#b7791f", color: "white", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 11, flexShrink: 0 }}>
             Ver Pro →
           </button>
@@ -1324,8 +1910,13 @@ export function TabStorico({ proyectos, t, canPlan, onPaywall }) {
         )}
       </div>
       {storicoMat.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "50px 0", color: "#a0aec0", background: "white", borderRadius: 12 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>📊</div><div>{t.storicoVacio}</div>
+        <div style={{ textAlign: "center", padding: "50px 24px", color: "#a0aec0", background: "white", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📈</div>
+          <div style={{ fontWeight: 800, fontSize: 16, color: "#1a365d", marginBottom: 8 }}>Sin historial aún</div>
+          <div style={{ fontSize: 13, color: "#718096", maxWidth: 300, margin: "0 auto 16px", lineHeight: 1.6 }}>
+            El historial se genera automáticamente a medida que creas presupuestos. Aquí verás precios históricos y proveedores de cada material.
+          </div>
+          <div style={{ fontSize: 12, color: "#a0aec0" }}>Crea tu primer proyecto para empezar a construir el historial</div>
         </div>
       ) : filtered.map((m, i) => (
         <div key={i} style={{ background: "white", borderRadius: 11, padding: "14px 18px", boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
@@ -1509,7 +2100,7 @@ export function TabHelp({ t }) {
         items={[
           ["Última compra", "Precio más reciente pagado por ese material"],
           ["Tendencia", "📈 Subió / 📉 Bajó vs primera compra registrada"],
-          ["Proyectos", "En cuántos proyectos apareció ese material"],
+          ["Cotizaciones", "En cuántas cotizaciones apareció ese material"],
           ["Últimas compras", "Historial de las últimas 5 compras con fecha y proveedor"],
         ]}
         tip="Útil para detectar inflación en materiales específicos y ajustar presupuestos futuros."

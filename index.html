@@ -3,21 +3,49 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Obra Nova SPA - Presupuestos</title>
+    <title>Obra Nova — Presupuestos que cierran contratos</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
 
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#1a365d" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Obra Nova" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 
-    <!-- SEO / share -->
-    <meta name="description" content="Sistema de presupuestos Obra Nova SPA" />
+    <!-- SEO -->
+    <meta name="description" content="Software de presupuestos para constructoras y maestros en Chile. Cotiza, firma y controla tus obras — todo desde el celular." />
+    <meta name="keywords" content="presupuestos construcción, cotizaciones obra, software constructora Chile, Obra Nova" />
+    <meta name="author" content="Obra Nova SPA" />
+
+    <!-- Open Graph (Facebook, WhatsApp, LinkedIn) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Obra Nova — Presupuestos que cierran contratos" />
+    <meta property="og:description" content="El software de gestión para constructoras y maestros en Chile. Presupuesta, firma y controla tus obras." />
+    <meta property="og:url" content="https://app.obranova.cl" />
+    <meta property="og:image" content="https://app.obranova.cl/icons/icon-512.png" />
+    <meta property="og:site_name" content="Obra Nova" />
+    <meta property="og:locale" content="es_CL" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Obra Nova — Presupuestos que cierran contratos" />
+    <meta name="twitter:description" content="Software de presupuestos para constructoras y maestros en Chile." />
+    <meta name="twitter:image" content="https://app.obranova.cl/icons/icon-512.png" />
+
+    <!-- Google Fonts per logo -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@800;900&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>
+    <!-- SheetJS per export .xlsx reale in TabExportContable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

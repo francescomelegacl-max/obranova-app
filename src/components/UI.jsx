@@ -110,68 +110,297 @@ export const Toast = ({ msg }) => {
 };
 
 // ─── LoginScreen ──────────────────────────────────────────────────────────────
-export const LoginScreen = ({ onLogin, auth, signIn }) => {
-  const [email,   setEmail]   = useState("");
-  const [pwd,     setPwd]     = useState("");
-  const [err,     setErr]     = useState("");
-  const [loading, setLoading] = useState(false);
+// Modes: "login" | "signup" | "reset"
+// Props:
+//   onLogin(user)          — chiamato dopo login o signup con successo
+//   auth                   — istanza Firebase Auth
+//   signIn                 — signInWithEmailAndPassword
+//   onSignupComplete(user, { nombre, empresa, telefono })
+//                          — opzionale: chiamato dopo signup per creare workspace
+export const LoginScreen = ({ onLogin, auth, signIn, onSignupComplete, currentUser, onLogout }) => {
+  const [mode,     setMode]     = useState("login");
+  const [email,    setEmail]    = useState("");
+  const [pwd,      setPwd]      = useState("");
+  const [pwd2,     setPwd2]     = useState("");
+  const [nombre,   setNombre]   = useState("");
+  const [empresa,  setEmpresa]  = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [err,      setErr]      = useState("");
+  const [info,     setInfo]     = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [showPwd,  setShowPwd]  = useState(false);
 
-  const handle = async () => {
-    setLoading(true); setErr("");
+  const reset = (m) => { setMode(m); setErr(""); setInfo(""); };
+
+  // ── Login ──────────────────────────────────────────────────────────────────
+  const handleLogin = async () => {
+    if (!email.trim() || !pwd) { setErr("Completa email y contraseña."); return; }
+    setLoading(true); setErr(""); setInfo("");
     try {
-      const uc = await signIn(auth, email, pwd);
+      const uc = await signIn(auth, email.trim(), pwd);
       onLogin(uc.user);
-    } catch {
-      setErr("Credenciales inválidas.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) {
+      const code = e?.code || "";
+      if (code === "auth/user-not-found" || code === "auth/wrong-password" || code === "auth/invalid-credential")
+        setErr("Email o contraseña incorrectos.");
+      else if (code === "auth/too-many-requests")
+        setErr("Demasiados intentos. Espera unos minutos.");
+      else
+        setErr("Error al iniciar sesión. Intenta de nuevo.");
+    } finally { setLoading(false); }
   };
+
+  // ── Signup ─────────────────────────────────────────────────────────────────
+  const handleSignup = async () => {
+    if (!nombre.trim())   { setErr("Ingresa tu nombre."); return; }
+    if (!empresa.trim())  { setErr("Ingresa el nombre de tu empresa."); return; }
+    if (!email.trim())    { setErr("Ingresa tu email."); return; }
+    if (pwd.length < 6)   { setErr("La contraseña debe tener al menos 6 caracteres."); return; }
+    if (pwd !== pwd2)     { setErr("Las contraseñas no coinciden."); return; }
+    setLoading(true); setErr(""); setInfo("");
+    try {
+      const { createUserWithEmailAndPassword, updateProfile } = await import("firebase/auth");
+      const uc = await createUserWithEmailAndPassword(auth, email.trim(), pwd);
+      await updateProfile(uc.user, { displayName: nombre.trim() });
+      // Salva profilo su Firestore /users/{uid}
+      try {
+        const { doc, setDoc } = await import("firebase/firestore");
+        const { db: firestoreDb } = await import("../lib/firebase");
+        await setDoc(doc(firestoreDb, "users", uc.user.uid), {
+          nombre:    nombre.trim(),
+          empresa:   empresa.trim(),
+          telefono:  telefono.trim(),
+          email:     email.trim(),
+          createdAt: new Date().toISOString(),
+          plan:      "free",
+        });
+      } catch (fsErr) {
+        console.warn("Profilo non salvato:", fsErr.message);
+      }
+      if (onSignupComplete) {
+        await onSignupComplete(uc.user, {
+          nombre:   nombre.trim(),
+          empresa:  empresa.trim(),
+          telefono: telefono.trim(),
+        });
+      }
+      onLogin(uc.user);
+    } catch (e) {
+      const code = e?.code || "";
+      if (code === "auth/email-already-in-use")
+        setErr("Ya existe una cuenta con ese email. Inicia sesión.");
+      else if (code === "auth/invalid-email")
+        setErr("El formato del email no es válido.");
+      else if (code === "auth/weak-password")
+        setErr("Contraseña muy débil. Usa al menos 6 caracteres.");
+      else
+        setErr("Error al crear la cuenta. Intenta de nuevo.");
+    } finally { setLoading(false); }
+  };
+
+  // ── Reset ──────────────────────────────────────────────────────────────────
+  const handleReset = async () => {
+    if (!email.trim()) { setErr("Ingresa tu email primero."); return; }
+    setLoading(true); setErr(""); setInfo("");
+    try {
+      const { sendPasswordResetEmail } = await import("firebase/auth");
+      await sendPasswordResetEmail(auth, email.trim());
+      setInfo("¡Listo! Revisa tu email para restablecer la contraseña.");
+      setMode("login");
+    } catch {
+      setErr("No encontramos una cuenta con ese email.");
+    } finally { setLoading(false); }
+  };
+
+  // ── Shared input style ─────────────────────────────────────────────────────
+  const inp = {
+    padding: "11px 14px", border: "2px solid #e2e8f0", borderRadius: 10,
+    fontSize: 14, outline: "none", width: "100%", boxSizing: "border-box",
+    fontFamily: "inherit", transition: "border-color .15s",
+  };
+  const inpFocus = (e) => { e.target.style.borderColor = "#2b6cb0"; };
+  const inpBlur  = (e) => { e.target.style.borderColor = "#e2e8f0"; };
+
+  const titles = {
+    login:  { h: "Bienvenido de vuelta", sub: "Sistema de Presupuestos" },
+    signup: { h: "Crea tu cuenta",       sub: "Empieza gratis, sin tarjeta" },
+    reset:  { h: "Recuperar contraseña", sub: "Te enviamos un enlace por email" },
+  };
+  const { h, sub } = titles[mode];
 
   return (
     <div style={{
       minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      background: "linear-gradient(135deg,#1a365d,#2d3748)", padding: 16,
+      background: "linear-gradient(135deg,#0f1f3d 0%,#1a365d 50%,#2d3748 100%)",
+      padding: 16, fontFamily: "'Segoe UI',system-ui,sans-serif",
     }}>
+      {/* Subtle background grid pattern */}
       <div style={{
-        background: "white", borderRadius: 20, padding: "36px 32px",
-        width: "100%", maxWidth: 380, boxShadow: "0 25px 60px rgba(0,0,0,.4)",
+        position: "fixed", inset: 0, opacity: .04,
+        backgroundImage: "linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)",
+        backgroundSize: "40px 40px", pointerEvents: "none",
+      }} />
+
+      <div style={{
+        background: "white", borderRadius: 24, padding: "40px 36px",
+        width: "100%", maxWidth: 420,
+        boxShadow: "0 32px 80px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.08)",
+        position: "relative",
       }}>
-        <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <img src={LOGO_URL} alt="Obra Nova" style={{ height: 56, marginBottom: 10 }}
+        {/* Logo + title */}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <img src={LOGO_URL} alt="Obra Nova" style={{ height: 60, marginBottom: 12 }}
             onError={e => { e.target.style.display = "none"; }} />
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#1a365d" }}>Obra Nova SPA</div>
-          <div style={{ fontSize: 13, color: "#718096", marginTop: 3 }}>Sistema de Presupuestos</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#1a365d", letterSpacing: -.3 }}>{h}</div>
+          <div style={{ fontSize: 13, color: "#a0aec0", marginTop: 4 }}>{sub}</div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <input
-            value={email} onChange={e => setEmail(e.target.value)}
-            type="email" placeholder="Email"
-            aria-label="Email"
-            style={{ padding: "11px 14px", border: "2px solid #e2e8f0", borderRadius: 10, fontSize: 14, outline: "none" }}
-          />
-          <input
-            value={pwd} onChange={e => setPwd(e.target.value)}
-            type="password" placeholder="Contraseña"
-            aria-label="Contraseña"
-            onKeyDown={e => e.key === "Enter" && handle()}
-            style={{ padding: "11px 14px", border: "2px solid #e2e8f0", borderRadius: 10, fontSize: 14, outline: "none" }}
-          />
+
+        {/* Banner utente già loggato */}
+        {currentUser && (
+          <div style={{
+            background: "#fffbeb", border: "1px solid #f6e05e",
+            borderRadius: 10, padding: "10px 14px", marginBottom: 16,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+          }}>
+            <div style={{ fontSize: 12, color: "#744210" }}>
+              <span style={{ fontWeight: 700 }}>Conectado como:</span><br />
+              <span style={{ color: "#92400e" }}>{currentUser.email}</span>
+            </div>
+            <button onClick={onLogout} style={{
+              padding: "6px 12px", background: "#c05621", color: "white",
+              border: "none", borderRadius: 7, cursor: "pointer",
+              fontWeight: 700, fontSize: 11, whiteSpace: "nowrap",
+            }}>Cerrar sesión</button>
+          </div>
+        )}
+
+        {/* Mode toggle tabs (login / signup) */}
+        {mode !== "reset" && (
+          <div style={{
+            display: "flex", background: "#f7fafc", borderRadius: 12,
+            padding: 4, marginBottom: 24, gap: 4,
+          }}>
+            {[["login", "Iniciar sesión"], ["signup", "Registrarse"]].map(([m, label]) => (
+              <button key={m} onClick={() => reset(m)} style={{
+                flex: 1, padding: "9px 0", border: "none", borderRadius: 9, cursor: "pointer",
+                fontWeight: 700, fontSize: 13, transition: "all .2s",
+                background: mode === m ? "white" : "transparent",
+                color:      mode === m ? "#1a365d" : "#a0aec0",
+                boxShadow:  mode === m ? "0 2px 8px rgba(0,0,0,.1)" : "none",
+              }}>{label}</button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+
+          {/* Signup-only fields */}
+          {mode === "signup" && (
+            <>
+              <input value={nombre} onChange={e => setNombre(e.target.value)}
+                type="text" placeholder="Nombre completo" aria-label="Nombre"
+                style={inp} onFocus={inpFocus} onBlur={inpBlur} />
+              <input value={empresa} onChange={e => setEmpresa(e.target.value)}
+                type="text" placeholder="Nombre de la empresa" aria-label="Empresa"
+                style={inp} onFocus={inpFocus} onBlur={inpBlur} />
+              <input value={telefono} onChange={e => setTelefono(e.target.value)}
+                type="tel" placeholder="Teléfono (opcional)" aria-label="Teléfono"
+                style={inp} onFocus={inpFocus} onBlur={inpBlur} />
+            </>
+          )}
+
+          {/* Email — always shown */}
+          <input value={email} onChange={e => setEmail(e.target.value)}
+            type="email" placeholder="Email" aria-label="Email"
+            onKeyDown={e => mode === "reset" && e.key === "Enter" && handleReset()}
+            style={inp} onFocus={inpFocus} onBlur={inpBlur} />
+
+          {/* Password fields */}
+          {mode !== "reset" && (
+            <div style={{ position: "relative" }}>
+              <input value={pwd} onChange={e => setPwd(e.target.value)}
+                type={showPwd ? "text" : "password"}
+                placeholder="Contraseña" aria-label="Contraseña"
+                onKeyDown={e => mode === "login" && e.key === "Enter" && handleLogin()}
+                style={{ ...inp, paddingRight: 44 }} onFocus={inpFocus} onBlur={inpBlur} />
+              <button onClick={() => setShowPwd(v => !v)} tabIndex={-1} style={{
+                position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                background: "none", border: "none", cursor: "pointer",
+                color: "#a0aec0", fontSize: 16, padding: 2,
+              }}>{showPwd ? "🙈" : "👁"}</button>
+            </div>
+          )}
+
+          {mode === "signup" && (
+            <input value={pwd2} onChange={e => setPwd2(e.target.value)}
+              type={showPwd ? "text" : "password"}
+              placeholder="Confirmar contraseña" aria-label="Confirmar contraseña"
+              onKeyDown={e => e.key === "Enter" && handleSignup()}
+              style={inp} onFocus={inpFocus} onBlur={inpBlur} />
+          )}
+
+          {/* Error / info */}
           {err && (
             <div role="alert" style={{
               background: "#fff5f5", border: "1px solid #fed7d7",
-              color: "#c53030", borderRadius: 8, padding: "8px 12px", fontSize: 13,
+              color: "#c53030", borderRadius: 8, padding: "9px 13px", fontSize: 13,
             }}>{err}</div>
           )}
-          <button
-            onClick={handle}
-            disabled={loading}
-            style={{
-              padding: 12, background: "#1a365d", color: "white",
-              border: "none", borderRadius: 10, cursor: "pointer",
-              fontWeight: 700, fontSize: 15, marginTop: 4,
-            }}
-          >{loading ? "Entrando..." : "Entrar"}</button>
+          {info && (
+            <div style={{
+              background: "#f0fff4", border: "1px solid #9ae6b4",
+              color: "#276749", borderRadius: 8, padding: "9px 13px", fontSize: 13,
+            }}>{info}</div>
+          )}
+
+          {/* Primary CTA */}
+          {mode === "login" && (
+            <button onClick={handleLogin} disabled={loading} style={{
+              padding: "13px 0", background: loading ? "#a0aec0" : "#1a365d",
+              color: "white", border: "none", borderRadius: 11,
+              cursor: loading ? "not-allowed" : "pointer",
+              fontWeight: 700, fontSize: 15, marginTop: 4, transition: "background .2s",
+            }}>{loading ? "Entrando..." : "Iniciar sesión"}</button>
+          )}
+          {mode === "signup" && (
+            <button onClick={handleSignup} disabled={loading} style={{
+              padding: "13px 0",
+              background: loading ? "#a0aec0" : "linear-gradient(135deg,#276749,#2f855a)",
+              color: "white", border: "none", borderRadius: 11,
+              cursor: loading ? "not-allowed" : "pointer",
+              fontWeight: 700, fontSize: 15, marginTop: 4, transition: "background .2s",
+            }}>{loading ? "Creando cuenta..." : "Crear cuenta gratis"}</button>
+          )}
+          {mode === "reset" && (
+            <>
+              <button onClick={handleReset} disabled={loading} style={{
+                padding: "13px 0", background: loading ? "#a0aec0" : "#1a365d",
+                color: "white", border: "none", borderRadius: 11,
+                cursor: loading ? "not-allowed" : "pointer",
+                fontWeight: 700, fontSize: 15, marginTop: 4,
+              }}>{loading ? "Enviando..." : "Enviar enlace de recuperación"}</button>
+              <button onClick={() => reset("login")} style={{
+                background: "none", border: "none", color: "#718096",
+                fontSize: 13, cursor: "pointer", textAlign: "center", padding: "4px 0",
+              }}>← Volver al login</button>
+            </>
+          )}
+
+          {/* Forgot password link */}
+          {mode === "login" && (
+            <button onClick={() => reset("reset")} style={{
+              background: "none", border: "none", color: "#4a90d9",
+              fontSize: 12, cursor: "pointer", textAlign: "center", padding: "2px 0",
+            }}>¿Olvidaste tu contraseña?</button>
+          )}
+
+          {/* Signup terms note */}
+          {mode === "signup" && (
+            <div style={{ fontSize: 11, color: "#a0aec0", textAlign: "center", lineHeight: 1.5 }}>
+              Al registrarte aceptas nuestros términos de uso.<br />
+              Tu workspace se crea automáticamente con el nombre de tu empresa.
+            </div>
+          )}
         </div>
       </div>
     </div>

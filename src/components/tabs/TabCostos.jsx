@@ -6,10 +6,8 @@ import { useTemplates, CATEGORIAS } from "../../hooks/useTemplates";
 
 // ── Export Excel partidas per categoria ───────────────────────────────────────
 async function exportExcelCostos(partidas, cats, info = {}) {
-  const XLSX = await import("xlsx");
+  const XLSX = await import("xlsx"); // lazy — caricato solo al click Export
   const wb = XLSX.utils.book_new();
-
-  // ── Foglio 1: Dettaglio partidas raggruppate per categoria ────────────────
   const rows = [];
   // Intestazione progetto
   rows.push(["PRESUPUESTO", info.descripcion || "", "", "", "", "", ""]);
@@ -196,9 +194,15 @@ function ModalAplicarTemplate({ templates, onApply, onDelete, onClose }) {
                         style={{ padding: "5px 9px", background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: 7, cursor: "pointer", color: "#c53030", fontSize: 12 }}>
                         🗑️
                       </button>
-                      <button onClick={() => { onApply(tpl); onClose(); }}
-                        style={{ padding: "6px 14px", background: "#1a365d", color: "white", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 12 }}>
-                        Aplicar →
+                      <button onClick={() => { onApply(tpl, "append"); onClose(); }}
+                        title="Agregar partidas al proyecto actual"
+                        style={{ padding: "6px 10px", background: "#ebf8ff", border: "1px solid #bee3f8", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 11, color: "#2b6cb0" }}>
+                        ＋ Agregar
+                      </button>
+                      <button onClick={() => { onApply(tpl, "replace"); onClose(); }}
+                        title="Reemplazar todas las partidas con este template"
+                        style={{ padding: "6px 10px", background: "#1a365d", color: "white", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 11 }}>
+                        ↺ Reemplazar
                       </button>
                     </>
                   )}
@@ -365,7 +369,112 @@ function PartidaCard({ p, cats, updP, delP, onEdit, t }) {
 }
 
 // ── TabCostos — mobile card + desktop table ────────────────────────────────────
-export default function TabCostos({ partidas = [], cats = [], addPartida, updP, delP, dupP, addFromListino, listino = [], t = {}, info = {}, pct = {}, condPago = "", condPagoPersonalizado = "", cuotas = [], iva = false, onApplyTemplate, canExcel = true, canTemplates = true, canPlan, onPaywall, partidasRestantes = Infinity, isPro = false }) {
+// ── Modal Crear Kit desde partidas ───────────────────────────────────────────
+function ModalCrearKit({ partidas, onSave, onClose }) {
+  const [nombre,      setNombre]      = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [categoria,   setCategoria]   = useState('General');
+  const [saving,      setSaving]      = useState(false);
+
+  const cats = ['General', 'Obra Gruesa', 'Instalaciones', 'Terminaciones', 'Muebles', 'Materiales'];
+
+  const handleSave = async () => {
+    if (!nombre.trim()) { alert('Ingresa un nombre para el kit'); return; }
+    setSaving(true);
+    try {
+      const materiales = partidas.map(p => ({
+        nombre:   p.nombre || '',
+        unidad:   p.unidad || 'gl',
+        cantidad: p.cant   || 1,
+        nota:     p.nota   || '',
+      }));
+      await onSave({
+        nombre:         nombre.trim(),
+        descripcion:    descripcion.trim(),
+        categoria,
+        esPersonalizado: true,
+        materiales,
+      });
+      onClose();
+    } catch (e) {
+      alert('Error al guardar kit: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputStyle = { width: '100%', padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#1a365d', boxSizing: 'border-box' };
+  const labelStyle = { fontSize: 12, fontWeight: 700, color: '#4a5568', marginBottom: 4, display: 'block' };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}>
+
+        {/* Header */}
+        <div style={{ padding: '18px 22px 14px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 16, color: '#1a365d' }}>📦 Crear Kit desde partidas</div>
+            <div style={{ fontSize: 12, color: '#718096', marginTop: 2 }}>{partidas.length} partida{partidas.length !== 1 ? 's' : ''} seleccionada{partidas.length !== 1 ? 's' : ''}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#718096' }}>✕</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          {/* Preview partidas */}
+          <div style={{ background: '#f7fafc', borderRadius: 9, padding: '10px 12px', maxHeight: 120, overflowY: 'auto', border: '1px solid #e2e8f0' }}>
+            {partidas.map((p, i) => (
+              <div key={i} style={{ fontSize: 11, color: '#4a5568', display: 'flex', justifyContent: 'space-between', paddingBottom: 3, borderBottom: i < partidas.length - 1 ? '1px solid #edf2f7' : 'none', marginBottom: 3 }}>
+                <span style={{ fontWeight: 600 }}>{p.nombre || '—'}</span>
+                <span style={{ color: '#718096' }}>{p.cant} {p.unidad}</span>
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <label style={labelStyle}>Nombre del kit *</label>
+            <input value={nombre} onChange={e => setNombre(e.target.value)}
+              placeholder="Ej: Baño completo, Pisos primer piso..."
+              style={inputStyle} maxLength={60} autoFocus />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Categoría</label>
+            <select value={categoria} onChange={e => setCategoria(e.target.value)} style={inputStyle}>
+              {cats.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label style={labelStyle}>Descripción (opcional)</label>
+            <textarea value={descripcion} onChange={e => setDescripcion(e.target.value)}
+              placeholder="Breve descripción del kit..."
+              rows={2} style={{ ...inputStyle, resize: 'vertical' }} maxLength={200} />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 22px 18px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '8px 18px', borderRadius: 9, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer', fontSize: 13, color: '#718096' }}>
+            Cancelar
+          </button>
+          <button onClick={handleSave} disabled={saving || !nombre.trim()}
+            style={{ padding: '8px 22px', borderRadius: 9, border: 'none', background: saving || !nombre.trim() ? '#e2e8f0' : '#553c9a', color: saving || !nombre.trim() ? '#a0aec0' : 'white', fontWeight: 800, fontSize: 13, cursor: saving || !nombre.trim() ? 'not-allowed' : 'pointer' }}>
+            {saving ? '⏳ Guardando...' : '📦 Guardar Kit'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function TabCostos({ partidas = [], cats = [], addPartida, updP, delP, dupP, addFromListino, listino = [], t = {}, info = {}, pct = {}, condPago = "", condPagoPersonalizado = "", cuotas = [], iva = false, onApplyTemplate, canExcel = true, canTemplates = true, canPlan, onPaywall, partidasRestantes = Infinity, isPro = false,
+  workspaceId,
+  // ── Props Kit ────────────────────────────────────────────────────────────────
+  onSaveKit,
+}) {
   const [filterCat,       setFilterCat]       = useState(null);
   const [showExtras,      setShowExtras]      = useState(false);
   const [editingP,        setEditingP]        = useState(null);
@@ -375,8 +484,11 @@ export default function TabCostos({ partidas = [], cats = [], addPartida, updP, 
   // 2.2 Drag & drop state
   const [dragId,   setDragId]   = useState(null);
   const [dragOver, setDragOver] = useState(null);
+  const [showCrearKit,    setShowCrearKit]    = useState(false);
+  const [selectedForKit,  setSelectedForKit]  = useState(new Set()); // ids partidas selezionate per kit
 
-  const { getAll, saveTemplate, deleteTemplate, markUsed } = useTemplates();
+  // useTemplates gestito interamente qui — non più passato come props da App.jsx
+  const { getAll, saveTemplate, deleteTemplate, markUsed } = useTemplates({ workspaceId: workspaceId || null });
 
   // 2.2 Handlers drag & drop (reordina partidas via updP)
   const handleDragStart = useCallback((id) => setDragId(id), []);
@@ -390,7 +502,7 @@ export default function TabCostos({ partidas = [], cats = [], addPartida, updP, 
     const [moved]   = reordered.splice(from, 1);
     reordered.splice(to, 0, moved);
     // Aggiorna campo "order" su ciascuna partida spostata
-    reordered.forEach((p, i) => { if (p.order !== i) updP(p.id, { order: i }); });
+    reordered.forEach((p, i) => { if (p.order !== i) updP(p.id, "order", i); });
     setDragId(null); setDragOver(null);
   }, [dragId, partidas, updP]);
 
@@ -507,6 +619,14 @@ export default function TabCostos({ partidas = [], cats = [], addPartida, updP, 
           </>}
           <td style={{ padding: "5px 3px" }}>
             <div style={{ display: "flex", gap: 4 }}>
+              {onSaveKit && (
+                <button
+                  onClick={() => setSelectedForKit(prev => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })}
+                  title={selectedForKit.has(p.id) ? "Quitar de selección Kit" : "Añadir a Kit"}
+                  style={{ background: selectedForKit.has(p.id) ? "#faf5ff" : "white", border: `1px solid ${selectedForKit.has(p.id) ? "#9f7aea" : "#e2e8f0"}`, borderRadius: 6, cursor: "pointer", color: selectedForKit.has(p.id) ? "#553c9a" : "#a0aec0", padding: "3px 7px", fontSize: 11 }}>
+                  📦
+                </button>
+              )}
               <button onClick={() => setEditingP(p)} title="Editar"
                 style={{ background: "#ebf8ff", border: "1px solid #bee3f8", borderRadius: 6, cursor: "pointer", color: "#2b6cb0", padding: "3px 7px", fontSize: 11 }}>✏️</button>
               <button onClick={() => delP(p.id)}
@@ -548,62 +668,115 @@ export default function TabCostos({ partidas = [], cats = [], addPartida, updP, 
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
       {/* Toolbar */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <button
-          onClick={() => addPartida(filterCat || cats[0])}
-          style={{ padding: isMobile ? "12px 20px" : "8px 14px", background: "#276749", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: isMobile ? 15 : 13, flex: isMobile ? 1 : "none" }}>
-          ➕ {t.agregar}
-        </button>
-        {isPro ? (
-          <span style={{
-            fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "3px 10px",
-            color: "#2b6cb0", background: "#ebf8ff", border: "1px solid #bee3f8",
-          }}>
-            ⚡ {partidas.length} partidas · Pro ilimitado
-          </span>
-        ) : (
-          <span style={{
-            fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "3px 10px",
-            color:      partidasRestantes === 0 ? "#c53030" : "#276749",
-            background: partidasRestantes === 0 ? "#fff5f5" : "#f0fff4",
-            border:     `1px solid ${partidasRestantes === 0 ? "#fed7d7" : "#9ae6b4"}`,
-          }}>
-            {partidasRestantes === 0
-              ? "⚠️ Límite 15 partidas alcanzado"
-              : `${partidas.length}/15 partidas (Free)`}
-          </span>
-        )}
-        {!isMobile && (
+      {isMobile ? (
+        // ── Mobile: 2 righe separate ─────────────────────────────────────────
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {/* Riga 1: aggiungi + badge */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              onClick={() => addPartida(filterCat || cats[0])}
+              style={{ flex: 1, padding: "13px 16px", background: "#276749", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 15 }}>
+              ➕ {t.agregar}
+            </button>
+            {isPro ? (
+              <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "4px 10px", color: "#2b6cb0", background: "#ebf8ff", border: "1px solid #bee3f8", whiteSpace: "nowrap" }}>
+                ⚡ {partidas.length} · Pro
+              </span>
+            ) : (
+              <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "4px 10px",
+                color: partidasRestantes === 0 ? "#c53030" : "#276749",
+                background: partidasRestantes === 0 ? "#fff5f5" : "#f0fff4",
+                border: `1px solid ${partidasRestantes === 0 ? "#fed7d7" : "#9ae6b4"}`, whiteSpace: "nowrap" }}>
+                {partidas.length}/15
+              </span>
+            )}
+          </div>
+          {/* Riga 2: azioni secondarie compatte */}
+          <div style={{ display: "flex", gap: 6 }}>
+            {partidas.length > 0 && (
+              <button
+                onClick={() => canExcel ? exportExcelCostos(partidas, cats, info) : onPaywall?.("exportExcel")}
+                style={{ flex: 1, padding: "10px 8px", background: canExcel ? "#f0fff4" : "#f7fafc", color: canExcel ? "#276749" : "#a0aec0", border: `1px solid ${canExcel ? "#9ae6b4" : "#e2e8f0"}`, borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                📊 Excel{!canExcel && " 🔒"}
+              </button>
+            )}
+            <button
+              onClick={() => canTemplates ? setShowAplicaTPL(true) : onPaywall?.("templates")}
+              style={{ flex: 1, padding: "10px 8px", background: canTemplates ? "#ebf8ff" : "#f7fafc", border: `1px solid ${canTemplates ? "#bee3f8" : "#e2e8f0"}`, borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 12, color: canTemplates ? "#2b6cb0" : "#a0aec0", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+              📂 Templates{!canTemplates && " 🔒"}
+            </button>
+            {partidas.length > 0 && canTemplates && (
+              <button
+                onClick={() => setShowSalvaTPL(true)}
+                style={{ flex: 1, padding: "10px 8px", background: "white", border: "1px solid #e2e8f0", borderRadius: 9, cursor: "pointer", fontWeight: 600, fontSize: 12, color: "#718096", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                💾 Guardar
+              </button>
+            )}
+            {partidas.length > 0 && onSaveKit && (
+              <button
+                onClick={() => setShowCrearKit(true)}
+                style={{ flex: 1, padding: "10px 8px", background: selectedForKit.size > 0 ? "#faf5ff" : "white", border: `1px solid ${selectedForKit.size > 0 ? "#9f7aea" : "#e2e8f0"}`, borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 12, color: selectedForKit.size > 0 ? "#553c9a" : "#718096", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                📦 {selectedForKit.size > 0 ? `Kit(${selectedForKit.size})` : "Kit"}
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        // ── Desktop: riga singola ─────────────────────────────────────────────
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            onClick={() => addPartida(filterCat || cats[0])}
+            style={{ padding: "8px 14px", background: "#276749", color: "white", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13 }}>
+            ➕ {t.agregar}
+          </button>
+          {isPro ? (
+            <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "3px 10px", color: "#2b6cb0", background: "#ebf8ff", border: "1px solid #bee3f8" }}>
+              ⚡ {partidas.length} partidas · Pro ilimitado
+            </span>
+          ) : (
+            <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 99, padding: "3px 10px",
+              color: partidasRestantes === 0 ? "#c53030" : "#276749",
+              background: partidasRestantes === 0 ? "#fff5f5" : "#f0fff4",
+              border: `1px solid ${partidasRestantes === 0 ? "#fed7d7" : "#9ae6b4"}` }}>
+              {partidasRestantes === 0 ? "⚠️ Límite 15 partidas alcanzado" : `${partidas.length}/15 partidas (Free)`}
+            </span>
+          )}
           <button onClick={() => setShowExtras(v => !v)}
             style={{ marginLeft: "auto", padding: "5px 12px", borderRadius: 8, border: "1px solid #e2e8f0", background: showExtras ? "#2b6cb0" : "white", color: showExtras ? "white" : "#718096", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
             {showExtras ? "▲ Menos" : "▼ Más"}
           </button>
-        )}
-        {/* 2.1 Export Excel */}
-        {partidas.length > 0 && (
+          {partidas.length > 0 && (
+            <button
+              onClick={() => canExcel ? exportExcelCostos(partidas, cats, info) : onPaywall?.("exportExcel")}
+              title={canExcel ? "Exportar a Excel (.xlsx)" : "Disponible en Plan Pro"}
+              style={{ padding: "8px 14px", background: canExcel ? "#276749" : "#e2e8f0", color: canExcel ? "white" : "#a0aec0", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+              📊 {canExcel ? "Excel" : "Excel 🔒"}
+            </button>
+          )}
           <button
-            onClick={() => canExcel ? exportExcelCostos(partidas, cats, info) : onPaywall?.("exportExcel")}
-            title={canExcel ? "Exportar a Excel (.xlsx)" : "Disponible en Plan Pro"}
-            style={{ padding: isMobile ? "12px 14px" : "8px 14px", background: canExcel ? "#276749" : "#e2e8f0", color: canExcel ? "white" : "#a0aec0", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: isMobile ? 15 : 12, display: "flex", alignItems: "center", gap: 5 }}>
-            📊 {!isMobile && (canExcel ? "Excel" : "Excel 🔒")}
+            onClick={() => canTemplates ? setShowAplicaTPL(true) : onPaywall?.("templates")}
+            title={canTemplates ? "Aplicar un template guardado" : "Disponible en Plan Pro"}
+            style={{ padding: "8px 14px", background: canTemplates ? "#ebf8ff" : "#f7fafc", border: `1px solid ${canTemplates ? "#bee3f8" : "#e2e8f0"}`, borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 12, color: canTemplates ? "#2b6cb0" : "#a0aec0", display: "flex", alignItems: "center", gap: 5 }}>
+            📂 {canTemplates ? "Templates" : "Templates 🔒"}
           </button>
-        )}
-        {/* 3.3 Templates */}
-        <button
-          onClick={() => canTemplates ? setShowAplicaTPL(true) : onPaywall?.("templates")}
-          title={canTemplates ? "Aplicar un template guardado" : "Disponible en Plan Pro"}
-          style={{ padding: isMobile ? "12px 14px" : "8px 14px", background: canTemplates ? "#ebf8ff" : "#f7fafc", border: `1px solid ${canTemplates ? "#bee3f8" : "#e2e8f0"}`, borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: isMobile ? 15 : 12, color: canTemplates ? "#2b6cb0" : "#a0aec0", display: "flex", alignItems: "center", gap: 5 }}>
-          📂 {!isMobile && (canTemplates ? "Templates" : "Templates 🔒")}
-        </button>
-        {partidas.length > 0 && canTemplates && (
-          <button
-            onClick={() => setShowSalvaTPL(true)}
-            title="Guardar partidas como template reutilizable"
-            style={{ padding: isMobile ? "12px 14px" : "8px 14px", background: "white", border: "1px solid #e2e8f0", borderRadius: 10, cursor: "pointer", fontWeight: 600, fontSize: isMobile ? 15 : 12, color: "#718096", display: "flex", alignItems: "center", gap: 5 }}>
-            💾 {!isMobile && "Guardar como template"}
-          </button>
-        )}
-      </div>
+          {partidas.length > 0 && canTemplates && (
+            <button
+              onClick={() => setShowSalvaTPL(true)}
+              title="Guardar partidas como template reutilizable"
+              style={{ padding: "8px 14px", background: "white", border: "1px solid #e2e8f0", borderRadius: 10, cursor: "pointer", fontWeight: 600, fontSize: 12, color: "#718096", display: "flex", alignItems: "center", gap: 5 }}>
+              💾 Guardar como template
+            </button>
+          )}
+          {partidas.length > 0 && onSaveKit && (
+            <button
+              onClick={() => setShowCrearKit(true)}
+              title={selectedForKit.size > 0 ? `Crear kit con ${selectedForKit.size} partidas seleccionadas` : "Crear kit con todas las partidas"}
+              style={{ padding: "8px 14px", background: selectedForKit.size > 0 ? "#faf5ff" : "white", border: `1px solid ${selectedForKit.size > 0 ? "#9f7aea" : "#e2e8f0"}`, borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 12, color: selectedForKit.size > 0 ? "#553c9a" : "#718096", display: "flex", alignItems: "center", gap: 5 }}>
+              📦 {selectedForKit.size > 0 ? `Kit (${selectedForKit.size})` : "Crear Kit"}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Filtri categoria */}
       <CategoryChips
@@ -681,6 +854,17 @@ export default function TabCostos({ partidas = [], cats = [], addPartida, updP, 
       )}
 
       {/* 3.3 Modal Salva Template */}
+      {showCrearKit && onSaveKit && (
+        <ModalCrearKit
+          partidas={selectedForKit.size > 0 ? partidas.filter(p => selectedForKit.has(p.id)) : partidas}
+          onSave={async (kitData) => {
+            await onSaveKit(kitData);
+            setSelectedForKit(new Set());
+            setShowCrearKit(false);
+          }}
+          onClose={() => setShowCrearKit(false)}
+        />
+      )}
       {showSalvaTPL && (
         <ModalSalvaTemplate
           partidas={partidas} pct={pct}
@@ -695,9 +879,8 @@ export default function TabCostos({ partidas = [], cats = [], addPartida, updP, 
       {showAplicaTPL && (
         <ModalAplicarTemplate
           templates={getAll()}
-          onApply={(tpl) => {
-            markUsed(tpl.id);
-            onApplyTemplate?.(tpl);
+          onApply={(tpl, mode) => {
+            onApplyTemplate?.(tpl, mode || "append");
           }}
           onDelete={deleteTemplate}
           onClose={() => setShowAplicaTPL(false)}

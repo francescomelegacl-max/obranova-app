@@ -1,61 +1,44 @@
 // ─── hooks/usePlan.js ─────────────────────────────────────────────────────────
 // Regole e limiti per ogni piano. Unica fonte di verità per i paywall.
-// v2 — 12 Marzo 2026
+// v3 — 18 Marzo 2026
 //
-// LIMITI FREE (definitivi):
-//   • 5 progetti totali — counter permanente, non si rinnova mai
-//   • 15 partidas per progetto
-//   • 20 voci listino prezzi
-//   • 10 articoli bodega/magazzino
-//   • 3 kits personalizzati salvati (kit predefiniti sempre disponibili)
-//   • 5 calcoli salvati nel Calcolatore
-//   • 30 giorni di storico visibile
-//   • Watermark "Obra Nova" nel PDF esportato E nell'anteprima app
-//   • WhatsApp automatico: disponibile (funnel di marketing)
-//   • Export Excel, firma digitale, fatture, templates, agenda: bloccati
+// STRATEGIA PIANI:
+//   Free   → prova il prodotto (3 cotiz, 15 partidas, watermark, 0 render)
+//   Pro    → professionista singolo ($19.900/mes) — tutto illimitato per 1 persona
+//   Empresa→ empresa con equipo ($39.900/mes) — multi-utente, render ∞, contabilidad
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Definizione limiti per piano ──────────────────────────────────────────────
 export const PLAN_LIMITS = {
   free: {
-    // Progetti — counter PERMANENTE (non si azzera, non si rinnova)
+    maxRenders:         0,
+    renderPhotoMode:    false,
+    crm:                false,   // no CRM
     maxProyectos:       5,
-    maxProyectosNote:   "permanente",   // usato nei messaggi UI
-
-    // Contenuto per progetto
-    maxPartidas:        15,             // righe max per preventivo
-
-    // Listino prezzi
-    maxListino:         20,             // voci max nel listino
-
-    // Bodega / Magazzino
-    maxBodega:          10,             // articoli max in magazzino
-
-    // Kits
-    maxKits:            3,              // kits personalizzati salvabili (predefiniti sempre visibili)
-
-    // Calcolatore
-    maxCalcoli:         5,              // calcoli rapidi salvabili
-
-    // Storico
-    historialDays:      30,             // giorni di storico visibili
-
-    // PDF e visual
-    pdfWatermark:       true,           // watermark nel PDF esportato
-    appWatermark:       true,           // watermark nell'anteprima dentro l'app
-
-    // Features bloccate
+    maxProyectosNote:   "permanente",
+    maxPartidas:        15,
+    maxListino:         20,
+    maxBodega:          10,
+    maxKits:            3,
+    maxCalcoli:         5,
+    historialDays:      30,
+    pdfWatermark:       true,
+    appWatermark:       true,
     exportExcel:        false,
+    exportContable:     false,
     firma:              false,
     fatture:            false,
     templates:          false,
     agenda:             false,
-
-    // Features disponibili nel Free
-    whatsapp:           true,           // funnel di marketing
+    whatsapp:           true,
+    maxMembers:         1,
+    soportePrioritario: false,
   },
 
   pro: {
+    maxRenders:         15,
+    renderPhotoMode:    true,
+    crm:                "lista", // lista sola, max 10 clienti
     maxProyectos:       Infinity,
     maxProyectosNote:   "",
     maxPartidas:        Infinity,
@@ -67,14 +50,21 @@ export const PLAN_LIMITS = {
     pdfWatermark:       false,
     appWatermark:       false,
     exportExcel:        true,
+    exportContable:     false,   // Solo Empresa
     firma:              true,
     fatture:            true,
     templates:          true,
     agenda:             true,
     whatsapp:           true,
+    maxMembers:         1,       // Solo 1 usuario
+    soportePrioritario: false,
   },
 
-  team: {
+  // Piano Empresa — in Firestore: plan = "empresa"
+  empresa: {
+    maxRenders:         Infinity,
+    renderPhotoMode:    true,
+    crm:                "full",  // CRM completo
     maxProyectos:       Infinity,
     maxProyectosNote:   "",
     maxPartidas:        Infinity,
@@ -86,11 +76,14 @@ export const PLAN_LIMITS = {
     pdfWatermark:       false,
     appWatermark:       false,
     exportExcel:        true,
+    exportContable:     true,    // Export Bsale/Defontana
     firma:              true,
     fatture:            true,
     templates:          true,
     agenda:             true,
     whatsapp:           true,
+    maxMembers:         5,       // Hasta 5 usuarios
+    soportePrioritario: true,    // WhatsApp prioritario
   },
 };
 
@@ -163,6 +156,36 @@ export const PAYWALL_FEATURES = {
     icon:   "🧮",
     plan:   "Pro",
   },
+  exportContable: {
+    title:  "Export contable",
+    desc:   "Exporta tus datos en formato compatible con Bsale y Defontana. Disponible en el plan Empresa.",
+    icon:   "🏛️",
+    plan:   "Empresa",
+  },
+  multiUsuario: {
+    title:  "Multi-usuario",
+    desc:   "Invita a tu equipo al workspace — cada uno con su rol y permisos. Disponible en el plan Empresa.",
+    icon:   "👥",
+    plan:   "Empresa",
+  },
+  renderIlimitado: {
+    title:  "Render AI ilimitados",
+    desc:   "Genera visualizaciones AI sin límite mensual. El plan Pro incluye 15/mes — con Empresa son ilimitados.",
+    icon:   "🎨",
+    plan:   "Empresa",
+  },
+  personalContratos: {
+    title:  "Gestión de personal",
+    desc:   "Administra contratos, sueldos y presencias de tu equipo. Disponible en el plan Empresa.",
+    icon:   "👷",
+    plan:   "Empresa",
+  },
+  crmEmpresa: {
+    title:  "CRM completo",
+    desc:   "Pipeline Kanban, seguimiento de clientes, notas de seguimiento, métricas de conversión y export CSV. El plan Pro incluye lista básica (10 clientes).",
+    icon:   "🤝",
+    plan:   "Empresa",
+  },
 };
 
 // ── Hook principale ───────────────────────────────────────────────────────────
@@ -185,11 +208,12 @@ export function usePlan({ workspace } = {}, proyectos = []) {
   const rawPlan    = workspace?.plan      || "free";
   const trialEndsAt = workspace?.trialEndsAt || null;
 
-  // Trial Pro: se trialEndsAt è nel futuro, tratta come pro
+  // Trial Pro: se trialEndsAt è nel futuro E il piano è free, tratta come pro
+  // Non sovrascrivere empresa con pro
   const isTrialActive = trialEndsAt && new Date(trialEndsAt) > new Date();
-  const plan   = isTrialActive ? "pro" : rawPlan;
+  const plan   = (isTrialActive && rawPlan === "free") ? "pro" : rawPlan;
   const limits = PLAN_LIMITS[plan] || PLAN_LIMITS.free;
-  const isPro  = plan === "pro" || plan === "team";
+  const isPro  = plan === "pro" || plan === "empresa";
 
   // Giorni rimasti nel trial
   const trialDaysLeft = isTrialActive
@@ -222,6 +246,7 @@ export function usePlan({ workspace } = {}, proyectos = []) {
     bodega:    "maxBodega",
     kits:      "maxKits",
     calcoli:   "maxCalcoli",
+    renders:   "maxRenders",
   };
 
   const canAdd = (feature, currentCount) => {
@@ -282,6 +307,11 @@ export function usePlan({ workspace } = {}, proyectos = []) {
 
     // Storico
     filterByHistorial,
+
+    // Render AI
+    canRender:       isPro,
+    renderPhotoMode: limits.renderPhotoMode || false,
+    maxRenders:      limits.maxRenders ?? 0,
 
     // Trial
     isTrialActive,
