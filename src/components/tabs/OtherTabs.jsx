@@ -208,7 +208,16 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
   const logoEffettivo = isPro && pdf.logoUrl ? pdf.logoUrl : LOGO_URL;
   // Header label Free — mostrato nell'intestazione del PDF Free
   const showFreeBranding = !isPro;
-  const totals = useMemo(() => calcTotals(partidas, pct, descuento), [partidas, pct, descuento]);
+  // Filtra solo partidas visibili al cliente (visible !== false + categoria visible)
+  const clientPartidas = useMemo(() => {
+    return partidas.filter(p => {
+      if (p.visible === false) return false;
+      if (p.cant * p.pu <= 0) return false;
+      const cv = getCatVis(p.cat);
+      return cv.visible;
+    });
+  }, [partidas, getCatVis]);
+  const totals = useMemo(() => calcTotals(clientPartidas, pct, descuento), [clientPartidas, pct, descuento]);
   const { cd, ci, gf, imprevistos: imprev, sub, util, total, descuentoAmt, totalConDesc, iva: ivaAmt, totalIva } = totals;
 
   const venceDate = info.fecha
@@ -412,18 +421,17 @@ _${info?.empresa||"Obra Nova"}_`;
           {cats.map((cat, i) => {
             const cv = getCatVis(cat);
             return (
-              <div key={cat} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", background: "#f7fafc", borderRadius: 9, border: `1px solid ${cv.visible ? CC[i % CC.length] + "44" : "#e2e8f0"}` }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "#2d3748" }}>{cat}</span>
+              <div key={cat} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", background: cv.visible ? "#f7fafc" : "#fafafa", borderRadius: 9, border: `1px solid ${cv.visible ? CC[i % CC.length] + "44" : "#e2e8f0"}`, opacity: cv.visible ? 1 : 0.6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: cv.visible ? "#2d3748" : "#a0aec0" }}>{cat}</span>
                 <button
                   onClick={() => setCatVisKey(cat, "visible", !cv.visible)}
-                  style={{ padding: "3px 9px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, background: cv.visible ? "#276749" : "#e2e8f0", color: cv.visible ? "white" : "#718096" }}
-                  aria-label={cv.visible ? t.visCatOcultar : t.visCatMostrar}
-                >{cv.visible ? "✓ Visible" : "Oculto"}</button>
+                  style={{ padding: "3px 9px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, background: cv.visible ? "#276749" : "#e53e3e", color: "white" }}
+                >{cv.visible ? "👁 Visible" : "🚫 Oculto"}</button>
                 {cv.visible && (
                   <button
                     onClick={() => setCatVisKey(cat, "modo", cv.modo === "detalle" ? "macro" : "detalle")}
-                    style={{ padding: "3px 9px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, background: "#ebf8ff", color: "#2b6cb0" }}
-                  >{cv.modo === "detalle" ? t.visDetalle : t.visMacro}</button>
+                    style={{ padding: "3px 9px", borderRadius: 7, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, background: cv.modo === "detalle" ? "#2b6cb0" : "#d69e2e", color: "white" }}
+                  >{cv.modo === "detalle" ? "📋 Detalle" : "📊 Solo total"}</button>
                 )}
               </div>
             );
@@ -575,7 +583,7 @@ _${empresaEnviar}_`;
           {cats.map((cat, ci) => {
             const cv = getCatVis(cat);
             if (!cv.visible) return null;
-            const vis = partidas.filter(p => p.cat === cat && p.visible !== false && p.cant * p.pu > 0);
+            const vis = clientPartidas.filter(p => p.cat === cat);
             if (!vis.length) return null;
             const catTotal = vis.reduce((s, p) => s + p.cant * p.pu, 0);
             const catColor = CC[ci % CC.length];
