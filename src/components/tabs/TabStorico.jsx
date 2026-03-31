@@ -2,17 +2,14 @@
 import { useState, useMemo } from "react";
 import { fmt } from "../../utils/helpers";
 
-export default function TabStorico({ proyectos, t, canPlan, onPaywall }) {
+export default function TabStorico({ proyectos, t, isPro = false, filterByHistorial, onPaywall }) {
   const [search, setSearch] = useState("");
 
-  // 4.1 Filtra storico per piano: Free = ultimi 60gg, Pro = illimitato
+  // Filtra storico per piano: Free = ultimi 30gg (da usePlan), Pro = illimitato
   const proyectosFiltrati = useMemo(() => {
-    if (!canPlan || canPlan("historialDays") !== false) return proyectos;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 60);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
-    return proyectos.filter(p => (p.info?.fecha || p.updatedAt || "") >= cutoffStr);
-  }, [proyectos, canPlan]);
+    if (isPro || !filterByHistorial) return proyectos;
+    return filterByHistorial(proyectos, p => p.info?.fecha || p.updatedAt || "");
+  }, [proyectos, isPro, filterByHistorial]);
 
   const storicoMat = useMemo(() => Object.values(
     proyectosFiltrati.reduce((acc, proj) => {
@@ -31,7 +28,7 @@ export default function TabStorico({ proyectos, t, canPlan, onPaywall }) {
       return acc;
     }, {})
   ).map(m => ({ ...m, projs: Array.from(m.projs), compras: m.compras.slice(-5).reverse() }))
-   .sort((a, b) => b.cantTotal - a.cantTotal).slice(0, 60), [proyectos, t]);
+   .sort((a, b) => b.cantTotal - a.cantTotal).slice(0, 60), [proyectosFiltrati, t]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return storicoMat;
@@ -49,15 +46,15 @@ export default function TabStorico({ proyectos, t, canPlan, onPaywall }) {
         <div style={{ color: "#a0aec0", fontSize: 12 }}>{t.storicoDesc}</div>
       </div>
       {/* 4.1 Banner storico limitato nel Free */}
-      {canPlan && !canPlan("historialDays") && (
+      {!isPro && (
         <div style={{ background: "#fffff0", border: "1px solid #f6e05e", borderRadius: 10, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 18 }}>⏳</span>
             <span style={{ fontSize: 12, color: "#744210", fontWeight: 700 }}>
-              Plan Free — histórico limitado a los últimos 60 días
+              Plan Free — histórico limitado a los últimos 30 días
             </span>
           </div>
-          <button onClick={() => onPaywall?.("historialDays")}
+          <button onClick={() => onPaywall?.("maxProyectos")}
             style={{ padding: "5px 14px", background: "#b7791f", color: "white", border: "none", borderRadius: 7, cursor: "pointer", fontWeight: 700, fontSize: 11, flexShrink: 0 }}>
             Ver Pro →
           </button>
@@ -80,8 +77,13 @@ export default function TabStorico({ proyectos, t, canPlan, onPaywall }) {
         )}
       </div>
       {storicoMat.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "50px 0", color: "#a0aec0", background: "white", borderRadius: 12 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>📊</div><div>{t.storicoVacio}</div>
+        <div style={{ textAlign: "center", padding: "50px 24px", color: "#a0aec0", background: "white", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📈</div>
+          <div style={{ fontWeight: 800, fontSize: 16, color: "#1a365d", marginBottom: 8 }}>Sin historial aún</div>
+          <div style={{ fontSize: 13, color: "#718096", maxWidth: 300, margin: "0 auto 16px", lineHeight: 1.6 }}>
+            El historial se genera automáticamente a medida que creas presupuestos. Aquí verás precios históricos y proveedores de cada material.
+          </div>
+          <div style={{ fontSize: 12, color: "#a0aec0" }}>Crea tu primer proyecto para empezar a construir el historial</div>
         </div>
       ) : filtered.map((m, i) => (
         <div key={i} style={{ background: "white", borderRadius: 11, padding: "14px 18px", boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>

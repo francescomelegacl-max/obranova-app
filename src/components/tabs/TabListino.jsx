@@ -125,13 +125,79 @@ function ComparativoProveedores({ listino, cats, catColors, t }) {
   );
 }
 
-export default function TabListino({ listino, cats, catColors, newCatName, setNewCatName, onAddCat, onDeleteItem, onAddFromListino, onOpenAddModal, DEFAULT_CATS, t, onUpdatePrecio, listinoRestanti = Infinity, onPaywall = () => {}, isPro = false }) {
+export default function TabListino({ listino, cats, catColors, newCatName, setNewCatName, onAddCat, onDeleteItem, onAddFromListino, onOpenAddModal, onSaveListinoItem, DEFAULT_CATS, t, onUpdatePrecio, listinoRestanti = Infinity, onPaywall = () => {}, isPro = false }) {
   const [filterCat,    setFilterCat]    = useState(null);
   const [search,       setSearch]       = useState("");
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768);
   const [vistaTab,     setVistaTab]     = useState("listino"); // "listino" | "comparativo"
   // 2.10 Edit inline prezzi
   const [editingPrice, setEditingPrice] = useState(null); // { id, field, value }
+  // Modal agregar/editar listino
+  const [showModal, setShowModal] = useState(false); // "add" | item.id | false
+  const [modalForm, setModalForm] = useState({ nombre: "", cat: cats[0] || "", unidad: "un", precioCompra: 0, precioCliente: 0, proveedor: "" });
+  const [showProvSugg, setShowProvSugg] = useState(false);
+
+  // Proveedores aggregati da tutti gli items del listino
+  const proveedores = useMemo(() => {
+    const set = new Set();
+    listino.forEach(x => { if (x.proveedor?.trim()) set.add(x.proveedor.trim()); });
+    return [...set].sort();
+  }, [listino]);
+
+  const provSuggFiltered = useMemo(() => {
+    if (!modalForm.proveedor?.trim()) return proveedores;
+    const q = modalForm.proveedor.toLowerCase();
+    return proveedores.filter(p => p.toLowerCase().includes(q));
+  }, [proveedores, modalForm.proveedor]);
+
+  const isEditing = showModal && showModal !== "add";
+
+  const handleModalSave = async () => {
+    if (!modalForm.nombre.trim()) return;
+    if (onSaveListinoItem) {
+      const payload = {
+        nombre: modalForm.nombre.trim(),
+        cat: modalForm.cat,
+        unidad: modalForm.unidad,
+        precioCompra: parseFloat(modalForm.precioCompra) || 0,
+        precio: parseFloat(modalForm.precioCompra) || 0,
+        precioVenta: parseFloat(modalForm.precioCliente) || 0,
+        precioCliente: parseFloat(modalForm.precioCliente) || 0,
+        proveedor: modalForm.proveedor.trim(),
+      };
+      if (isEditing) {
+        // Edit: update via onUpdatePrecio for each field
+        const item = listino.find(x => x.id === showModal);
+        if (item && onUpdatePrecio) {
+          for (const [k, v] of Object.entries(payload)) {
+            if (item[k] !== v) await onUpdatePrecio(item.id, k, v);
+          }
+        }
+      } else {
+        await onSaveListinoItem(payload);
+      }
+    }
+    setModalForm({ nombre: "", cat: cats[0] || "", unidad: "un", precioCompra: 0, precioCliente: 0, proveedor: "" });
+    setShowModal(false);
+  };
+
+  const openAddModal = () => {
+    if (listinoRestanti === 0) { onPaywall("maxListino"); return; }
+    setModalForm({ nombre: "", cat: cats[0] || "", unidad: "un", precioCompra: 0, precioCliente: 0, proveedor: "" });
+    setShowModal("add");
+  };
+
+  const openEditModal = (item) => {
+    setModalForm({
+      nombre: item.nombre || "",
+      cat: item.cat || cats[0] || "",
+      unidad: item.unidad || "un",
+      precioCompra: item.precioCompra || 0,
+      precioCliente: item.precioCliente || item.precio || 0,
+      proveedor: item.proveedor || "",
+    });
+    setShowModal(item.id);
+  };
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", h);
@@ -184,7 +250,7 @@ export default function TabListino({ listino, cats, catColors, newCatName, setNe
             </button>
           ))}
         </div>
-        <button onClick={() => listinoRestanti === 0 ? onPaywall("maxListino") : onOpenAddModal()}
+        <button onClick={openAddModal}
           style={{ padding: "8px 16px", background: "#276749", color: "white", border: "none", borderRadius: 9, cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
           {t.listinoAgregar}
         </button>
@@ -287,11 +353,11 @@ export default function TabListino({ listino, cats, catColors, newCatName, setNe
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input value={newCatName} onChange={e => setNewCatName(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && onAddCat()}
+              onKeyDown={e => { if (e.key === "Enter" && newCatName.trim()) { onAddCat(newCatName.trim()); setNewCatName(""); } }}
               placeholder={t.catNombrePlaceholder} aria-label={t.catAgregar}
               style={{ flex: 1, padding: "8px 11px", border: "2px solid #e2e8f0", borderRadius: 8, fontSize: 13, color: "#1a365d" }}
             />
-            <button onClick={onAddCat}
+            <button onClick={() => { if (newCatName.trim()) { onAddCat(newCatName.trim()); setNewCatName(""); } }}
               style={{ padding: "8px 14px", background: "#2b6cb0", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap" }}>
               {t.catAgregar}
             </button>
@@ -301,9 +367,20 @@ export default function TabListino({ listino, cats, catColors, newCatName, setNe
 
       {/* Lista */}
       {listino.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "50px 0", color: "#a0aec0", background: "white", borderRadius: 12 }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>📦</div>
-          <div>{t.listinoVacio}</div>
+        <div style={{ textAlign: "center", padding: "50px 24px", color: "#a0aec0", background: "white", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
+          <div style={{ fontWeight: 800, fontSize: 16, color: "#1a365d", marginBottom: 8 }}>Tu lista de precios está vacía</div>
+          <div style={{ fontSize: 13, color: "#718096", maxWidth: 280, margin: "0 auto 20px", lineHeight: 1.6 }}>
+            Agrega materiales con sus precios y proveedores para usarlos en cualquier presupuesto con un clic
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 16 }}>
+            {["💰 Precio por unidad", "🏭 Proveedor", "📋 Insertar en partida"].map((s, i) => (
+              <div key={i} style={{ background: "#ebf8ff", border: "1px solid #bee3f8", borderRadius: 8, padding: "6px 12px", fontSize: 11, color: "#2b6cb0", fontWeight: 600 }}>
+                {i + 1}. {s}
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: "#a0aec0" }}>👆 Usa <strong>+ Agregar ítem</strong> para empezar</div>
         </div>
       ) : listinoFiltrato.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 0", color: "#a0aec0", background: "white", borderRadius: 12 }}>
@@ -349,6 +426,8 @@ export default function TabListino({ listino, cats, catColors, newCatName, setNe
                   <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
                     <button onClick={() => onAddFromListino(item)}
                       style={{ padding: "6px 10px", background: "#ebf8ff", border: "1px solid #bee3f8", borderRadius: 7, cursor: "pointer", color: "#2b6cb0", fontSize: 12, fontWeight: 700 }}>+</button>
+                    <button onClick={() => openEditModal(item)}
+                      style={{ padding: "6px 8px", background: "#fffff0", border: "1px solid #fefcbf", borderRadius: 7, cursor: "pointer", color: "#b7791f", fontSize: 11 }}>✏️</button>
                     <button onClick={() => onDeleteItem(item.id)}
                       style={{ padding: "6px 8px", background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: 7, cursor: "pointer", color: "#c53030", fontSize: 11 }}>✕</button>
                   </div>
@@ -460,6 +539,9 @@ export default function TabListino({ listino, cats, catColors, newCatName, setNe
                               borderRadius: 7, cursor: "pointer", color: "#2b6cb0", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>
                             + {t.costos || "Usar"}
                           </button>
+                          <button onClick={() => openEditModal(item)} aria-label="Editar"
+                            style={{ padding: "4px 8px", background: "#fffff0", border: "1px solid #fefcbf",
+                              borderRadius: 7, cursor: "pointer", color: "#b7791f", fontSize: 11 }}>✏️</button>
                           <button onClick={() => onDeleteItem(item.id)} aria-label="Eliminar"
                             style={{ padding: "4px 8px", background: "#fff5f5", border: "1px solid #fed7d7",
                               borderRadius: 7, cursor: "pointer", color: "#c53030", fontSize: 11 }}>✕</button>
@@ -475,6 +557,91 @@ export default function TabListino({ listino, cats, catColors, newCatName, setNe
         </div>
       )}
       </>)}{/* fine vistaTab === listino */}
+
+      {/* ── Modal Agregar / Editar Listino ────────────────────────────────── */}
+      {showModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.45)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowModal(false); }}>
+          <div style={{ background:"white", borderRadius:14, padding:24, width:"100%", maxWidth:440, boxShadow:"0 8px 32px rgba(0,0,0,.2)" }}>
+            <div style={{ fontWeight:800, fontSize:16, color:"#1a365d", marginBottom:16 }}>
+              {isEditing ? "✏️ Editar item" : "➕ Agregar al listino"}
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              <div>
+                <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>Nombre *</label>
+                <input value={modalForm.nombre} onChange={e => setModalForm(f => ({ ...f, nombre: e.target.value }))}
+                  placeholder="Ej: Cemento 25kg" autoFocus
+                  style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box" }} />
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>Categoría</label>
+                  <select value={modalForm.cat} onChange={e => setModalForm(f => ({ ...f, cat: e.target.value }))}
+                    style={{ width:"100%", padding:"9px 10px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:12 }}>
+                    {cats.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div style={{ width:90 }}>
+                  <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>Unidad</label>
+                  <select value={modalForm.unidad} onChange={e => setModalForm(f => ({ ...f, unidad: e.target.value }))}
+                    style={{ width:"100%", padding:"9px 10px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:12 }}>
+                    {["un","m²","m³","ml","kg","gl","hr","saco","bolsa","rollo","lt"].map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>Precio compra</label>
+                  <input type="number" min="0" value={modalForm.precioCompra || ""} placeholder="$0"
+                    onChange={e => setModalForm(f => ({ ...f, precioCompra: e.target.value }))}
+                    style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box", textAlign:"right" }} />
+                </div>
+                <div style={{ flex:1 }}>
+                  <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>Precio cliente</label>
+                  <input type="number" min="0" value={modalForm.precioCliente || ""} placeholder="$0"
+                    onChange={e => setModalForm(f => ({ ...f, precioCliente: e.target.value }))}
+                    style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box", textAlign:"right" }} />
+                </div>
+              </div>
+              {/* Proveedor con autocomplete */}
+              <div style={{ position:"relative" }}>
+                <label style={{ fontSize:11, fontWeight:600, color:"#4a5568", display:"block", marginBottom:3 }}>
+                  Proveedor {proveedores.length > 0 && <span style={{ color:"#a0aec0", fontWeight:400 }}>({proveedores.length} guardados)</span>}
+                </label>
+                <input value={modalForm.proveedor}
+                  onChange={e => { setModalForm(f => ({ ...f, proveedor: e.target.value })); setShowProvSugg(true); }}
+                  onFocus={() => setShowProvSugg(true)}
+                  onBlur={() => setTimeout(() => setShowProvSugg(false), 150)}
+                  placeholder="Escribe o selecciona un proveedor"
+                  style={{ width:"100%", padding:"9px 12px", border:"1.5px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box" }} />
+                {showProvSugg && provSuggFiltered.length > 0 && (
+                  <div style={{ position:"absolute", top:"100%", left:0, right:0, background:"white", border:"1.5px solid #e2e8f0", borderTop:"none", borderRadius:"0 0 8px 8px", maxHeight:150, overflowY:"auto", zIndex:10, boxShadow:"0 4px 12px rgba(0,0,0,.1)" }}>
+                    {provSuggFiltered.map(p => (
+                      <div key={p}
+                        onMouseDown={() => { setModalForm(f => ({ ...f, proveedor: p })); setShowProvSugg(false); }}
+                        style={{ padding:"8px 12px", cursor:"pointer", fontSize:12, color:"#2d3748", borderBottom:"1px solid #f7fafc" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#ebf8ff"}
+                        onMouseLeave={e => e.currentTarget.style.background = "white"}>
+                        🏭 {p}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:8, marginTop:18, justifyContent:"flex-end" }}>
+              <button onClick={() => setShowModal(false)}
+                style={{ padding:"9px 18px", border:"1px solid #e2e8f0", borderRadius:8, background:"white", color:"#718096", cursor:"pointer", fontWeight:600, fontSize:13 }}>
+                Cancelar
+              </button>
+              <button onClick={handleModalSave} disabled={!modalForm.nombre.trim()}
+                style={{ padding:"9px 22px", border:"none", borderRadius:8, background: modalForm.nombre.trim() ? "#276749" : "#e2e8f0", color: modalForm.nombre.trim() ? "white" : "#a0aec0", cursor: modalForm.nombre.trim() ? "pointer" : "default", fontWeight:700, fontSize:13 }}>
+                {isEditing ? "Guardar cambios" : "Agregar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

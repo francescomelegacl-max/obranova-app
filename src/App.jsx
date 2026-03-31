@@ -63,12 +63,12 @@ const TabContratos       = lazy(() => import("./components/tabs/TabContratos"));
 const TabClientes        = lazy(() => import("./components/tabs/TabClientes"));
 
 // ── Tabs (named exports da OtherTabs — lazy con named re-export) ──────────────
-const TabResumen      = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabResumen })));
-const TabVistaCliente = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabVistaCliente })));
-const TabProyectos    = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabProyectos })));
-const TabListino      = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabListino })));
-const TabStorico      = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabStorico })));
-const TabHelp         = lazy(() => import("./components/tabs/OtherTabs").then(m => ({ default: m.TabHelp })));
+const TabResumen      = lazy(() => import("./components/tabs/TabResumen"));
+const TabVistaCliente = lazy(() => import("./components/tabs/TabVistaCliente"));
+const TabProyectos    = lazy(() => import("./components/tabs/TabProyectos"));
+const TabListino      = lazy(() => import("./components/tabs/TabListino"));
+const TabStorico      = lazy(() => import("./components/tabs/TabStorico"));
+const TabHelp         = lazy(() => import("./components/tabs/TabHelp"));
 
 // ── TabFatture (named export — lazy) ─────────────────────────────────────────
 const TabFatture = lazy(() => import("./components/tabs/TabFatture").then(m => ({ default: m.TabFatture })));

@@ -175,7 +175,7 @@ export default function TabProyectos({ proyectos, currentId, onLoad, onDelete, o
       {/* Riga 3: risultati summary */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 11, color: "#a0aec0", fontWeight: 600 }}>
-          {filtered.length} de {proyectos.length} proyectos
+          {filtered.length} de {proyectos.length} cotizaciones
         </span>
         <span style={{ fontSize: 12, fontWeight: 700, color: "#276749" }}>
           Total filtrado: {fmt(totalMonto)}
@@ -190,7 +190,7 @@ export default function TabProyectos({ proyectos, currentId, onLoad, onDelete, o
       <div style={{ background: "white", borderRadius: 16, padding: "60px 24px", textAlign: "center", boxShadow: "0 1px 4px rgba(0,0,0,.07)" }}>
         <div style={{ fontSize: 56, marginBottom: 14 }}>📁</div>
         <div style={{ fontWeight: 800, fontSize: 18, color: "#1a365d", marginBottom: 8 }}>
-          Aún no tienes proyectos
+          Aún no tienes cotizaciones
         </div>
         <div style={{ fontSize: 14, color: "#718096", maxWidth: 300, margin: "0 auto 28px", lineHeight: 1.6 }}>
           Crea tu primer presupuesto y envíaselo al cliente en menos de 5 minutos
