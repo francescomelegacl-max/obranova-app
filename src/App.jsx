@@ -592,12 +592,15 @@ export default function App() {
             getCatVis={(c) => {
               const stored = proyState.catVis?.[c];
               if (!stored || typeof stored !== "object") return { visible: stored !== false, modo: "detalle" };
-              return { visible: true, modo: "detalle", ...stored };
+              return { visible: stored.visible !== false, modo: stored.modo || "detalle" };
             }}
-            setCatVisKey={(c, key, value) => mkSetter("catVis")(prev => {
-              const prev2 = prev[c] && typeof prev[c] === "object" ? prev[c] : { visible: prev[c] !== false, modo: "detalle" };
-              return { ...prev, [c]: { ...prev2, [key]: value } };
-            })}
+            setCatVisKey={(c, key, value) => {
+              setProyState(s => {
+                const prev = s.catVis || {};
+                const cur = prev[c] && typeof prev[c] === "object" ? prev[c] : { visible: prev[c] !== false, modo: "detalle" };
+                return { ...s, catVis: { ...prev, [c]: { ...cur, [key]: value } } };
+              });
+            }}
             iva={proyState.iva} estado={proyState.estado}
             currentId={currentId} validez={proyState.validez} t={t}
             firme={firme} fotos={proyState.fotos || []}

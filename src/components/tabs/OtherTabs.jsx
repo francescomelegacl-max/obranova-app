@@ -200,7 +200,7 @@ export function TabResumen({ partidas, pct, cats, iva, t, descuento = { tipo: "p
 
 // ─── TabVistaCliente ──────────────────────────────────────────────────────────
 
-export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, setCatVisKey, iva, estado, currentId, validez, t, onInviaFirma, firme = [], fotos = [], plan = "free", trialEndsAt = null, onTrackPdf, descuento = { tipo: "pct", valor: 0, descripcion: "" }, setDescuento, aiRenders = [], workspaceId, onShowBenchmark }) {
+export function TabVistaCliente({ info, partidas, pct, cats, catVis = {}, getCatVis, setCatVisKey, iva, estado, currentId, validez, t, onInviaFirma, firme = [], fotos = [], plan = "free", trialEndsAt = null, onTrackPdf, descuento = { tipo: "pct", valor: 0, descripcion: "" }, setDescuento, aiRenders = [], workspaceId, onShowBenchmark }) {
   const pdf = usePDFSettings();
   const isTrialActive = trialEndsAt && new Date(trialEndsAt) > new Date();
   const isPro = plan === "pro" || plan === "empresa" || isTrialActive;
@@ -216,7 +216,7 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis, getCatVis, 
       const cv = getCatVis(p.cat);
       return cv.visible;
     });
-  }, [partidas, getCatVis]);
+  }, [partidas, catVis]); // eslint-disable-line
   const totals = useMemo(() => calcTotals(clientPartidas, pct, descuento), [clientPartidas, pct, descuento]);
   const { cd, ci, gf, imprevistos: imprev, sub, util, total, descuentoAmt, totalConDesc, iva: ivaAmt, totalIva } = totals;
 
