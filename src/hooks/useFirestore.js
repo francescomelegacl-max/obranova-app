@@ -7,6 +7,7 @@ import { doc, setDoc, collection, getDocs, deleteDoc, updateDoc, getDoc } from "
 import { auth, db } from "../lib/firebase";
 import { DEFAULT_CATS } from "../utils/constants";
 import { mkVacioState } from "./useProyecto";
+import { handleError } from "../utils/errorHandler";
 
 // ── Nova Profile: aggiorna profilo costruttore in background ────────────────
 // Analizza tutti i presupuestos del workspace e calcola:
@@ -129,7 +130,7 @@ async function updateNovaProfile(basePath, proyectos) {
 
     await setDoc(doc(db, basePath, "novaProfile", "current"), profile, { merge: true });
   } catch (e) {
-    console.warn("Nova profile update:", e.message);
+    handleError(e, { context: "updateNovaProfile", silent: true });
   }
 }
 
@@ -162,7 +163,7 @@ export function useFirestore({ onToast, workspaceId }) {
       setProyectos(list);
       setFotosMap(fm);
       return list;
-    } catch (e) { console.error("loadProyectos:", e); return []; }
+    } catch (e) { return handleError(e, { context: "loadProyectos", onToast, fallback: [] }); }
   }, [basePath]);
 
   const saveProyecto = useCallback(async (currentId, proyState, manual = false) => {
@@ -196,9 +197,7 @@ export function useFirestore({ onToast, workspaceId }) {
       }
       return id;
     } catch (e) {
-      console.error("saveProyecto:", e);
-      if (manual) onToast("⚠️ Error al guardar: " + e.message);
-      return null;
+      return handleError(e, { context: "saveProyecto", onToast: manual ? onToast : undefined, fallback: null });
     } finally { setGuardando(false); }
   }, [basePath, loadProyectos, onToast]);
 
@@ -248,9 +247,7 @@ export function useFirestore({ onToast, workspaceId }) {
       onToast("📋 Proyecto duplicado");
       return { id: ref.id, ...copia };
     } catch (e) {
-      console.error("duplicaProyecto:", e);
-      onToast("⚠️ Error al duplicar: " + e.message);
-      return null;
+      return handleError(e, { context: "duplicaProyecto", onToast, fallback: null });
     }
   }, [basePath, loadProyectos, onToast]);
 
@@ -262,7 +259,7 @@ export function useFirestore({ onToast, workspaceId }) {
       snap.forEach(d => list.push({ id: d.id, ...d.data() }));
       list.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
       setListino(list);
-    } catch (e) { console.error("loadListino:", e); }
+    } catch (e) { handleError(e, { context: "loadListino", onToast }); }
   }, [basePath]);
 
   const saveListinoItem = useCallback(async (form) => {
@@ -273,7 +270,7 @@ export function useFirestore({ onToast, workspaceId }) {
       await setDoc(ref, { ...form, updatedAt: new Date().toISOString() });
       await loadListino();
       onToast("✅ Guardado en listino");
-    } catch (e) { onToast("⚠️ Error: " + e.message); console.error(e); }
+    } catch (e) { handleError(e, { context: "saveListinoItem", onToast }); }
   }, [basePath, loadListino, onToast]);
 
   const deleteListinoItem = useCallback(async (id) => {
@@ -293,8 +290,7 @@ export function useFirestore({ onToast, workspaceId }) {
       setListino(l => l.map(x => x.id === id ? { ...x, ...updates } : x));
       onToast("✅ Giacenza aggiornata");
     } catch (e) {
-      console.error("updateGiacenza:", e);
-      onToast("⚠️ Errore: " + e.message);
+      handleError(e, { context: "updateGiacenza", onToast });
     }
   }, [basePath, onToast]);
 
@@ -307,7 +303,7 @@ export function useFirestore({ onToast, workspaceId }) {
       setListino(l => l.map(x => x.id === id ? { ...x, precioCompra: prezzo } : x));
       onToast("✅ Prezzo aggiornato");
     } catch (e) {
-      onToast("⚠️ Errore: " + e.message);
+      handleError(e, { context: "updatePrezzoManuale", onToast });
     }
   }, [basePath, onToast]);
 
@@ -319,7 +315,7 @@ export function useFirestore({ onToast, workspaceId }) {
       snap.forEach(d => extra.push(d.data().nombre));
       const merged = [...DEFAULT_CATS, ...extra.filter(c => !DEFAULT_CATS.includes(c))];
       setCats(merged);
-    } catch (e) { console.error("loadCats:", e); }
+    } catch (e) { handleError(e, { context: "loadCats", onToast }); }
   }, [basePath]);
 
   const addCat = useCallback(async (name, t) => {
@@ -330,7 +326,7 @@ export function useFirestore({ onToast, workspaceId }) {
       await setDoc(ref, { nombre: name, createdAt: new Date().toISOString() });
       setCats(c => [...c, name]);
       onToast(t?.catGuardada || "✅ Categoría guardada");
-    } catch (e) { onToast("⚠️ Error"); console.error(e); }
+    } catch (e) { handleError(e, { context: "addCat", onToast }); }
   }, [basePath, cats, onToast]);
 
   // ── Firme — carica le firme di un progetto specifico ────────────────────
@@ -345,7 +341,7 @@ export function useFirestore({ onToast, workspaceId }) {
       });
       list.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
       return list;
-    } catch (e) { console.warn("loadFirme:", e.message); return []; }
+    } catch (e) { return handleError(e, { context: "loadFirme", fallback: [] }); }
   }, [basePath]);
 
   // ── Clientes CRM ─────────────────────────────────────────────────────────
@@ -359,7 +355,7 @@ export function useFirestore({ onToast, workspaceId }) {
       list.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
       setClientes(list);
       return list;
-    } catch (e) { console.warn("loadClientes:", e.message); return []; }
+    } catch (e) { return handleError(e, { context: "loadClientes", fallback: [] }); }
   }, [basePath]);
 
   // ── Proyectos creados desde el wizard público ─────────────────────────────
@@ -376,7 +372,7 @@ export function useFirestore({ onToast, workspaceId }) {
         setNovaProfile(snap.data());
         return snap.data();
       }
-    } catch (e) { console.warn("loadNovaProfile:", e.message); }
+    } catch (e) { handleError(e, { context: "loadNovaProfile", silent: true }); }
     return null;
   }, [basePath]);
 

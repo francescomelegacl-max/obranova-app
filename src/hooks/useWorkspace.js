@@ -5,6 +5,7 @@ import {
   deleteDoc, updateDoc, query, where, onSnapshot
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
+import { handleError } from "../utils/errorHandler";
 
 export const ROLES = {
   OWNER:  "owner",
@@ -85,8 +86,7 @@ export function useWorkspace({ onToast }) {
       setWorkspaces(list);
       return list;
     } catch (e) {
-      console.error("loadWorkspaces:", e);
-      return [];
+      return handleError(e, { context: "loadWorkspaces", onToast, fallback: [] });
     } finally {
       setLoadingWS(false);
     }
@@ -113,7 +113,7 @@ export function useWorkspace({ onToast }) {
           setWorkspace(prev => ({ ...prev, ...snap.data(), id: snap.id, myRole: prev?.myRole ?? ws.myRole }));
         }
       },
-      (e) => console.error("onSnapshot workspace:", e)
+      (e) => handleError(e, { context: "onSnapshot:workspace", onToast })
     );
     wsUnsubRef.current = unsub;
 
@@ -124,7 +124,7 @@ export function useWorkspace({ onToast }) {
         snap.forEach(d => list.push({ uid: d.id, ...d.data() }));
         setMembers(list);
       })
-      .catch(e => console.error("loadMembers:", e));
+      .catch(e => handleError(e, { context: "loadMembers", onToast }));
   }, []);
 
   // ── Cleanup listener quando il componente smonta ──────────────────────────
@@ -160,8 +160,7 @@ export function useWorkspace({ onToast }) {
       onToast("✅ Azienda creata!");
       return { id: ref.id, ...wsData, myRole: ROLES.OWNER };
     } catch (e) {
-      console.error("createWorkspace:", e);
-      onToast("❌ Errore nella creazione: " + e.message);
+      handleError(e, { context: "createWorkspace", onToast });
       return null;
     }
   }, [onToast]);
@@ -187,8 +186,7 @@ export function useWorkspace({ onToast }) {
       onToast(`✅ Invito inviato a ${email}`);
       return true;
     } catch (e) {
-      console.error("inviteMember:", e);
-      onToast("❌ Errore: " + e.message);
+      handleError(e, { context: "inviteMember", onToast });
       return false;
     }
   }, [workspace, onToast]);
@@ -208,8 +206,7 @@ export function useWorkspace({ onToast }) {
       snap.forEach(d => list.push({ id: d.id, ...d.data() }));
       return list;
     } catch (e) {
-      console.error("loadPendingInvites:", e);
-      return [];
+      return handleError(e, { context: "loadPendingInvites", fallback: [] });
     }
   }, []);
 
@@ -229,8 +226,7 @@ export function useWorkspace({ onToast }) {
       onToast(`✅ Sei entrato in ${invite.workspaceName}`);
       return true;
     } catch (e) {
-      console.error("acceptInvite:", e);
-      onToast("❌ Errore: " + e.message);
+      handleError(e, { context: "acceptInvite", onToast });
       return false;
     }
   }, [onToast]);
@@ -241,8 +237,7 @@ export function useWorkspace({ onToast }) {
       await updateDoc(doc(db, "invites", inviteId), { status: "rejected" });
       return true;
     } catch (e) {
-      console.error("rejectInvite:", e);
-      return false;
+      return handleError(e, { context: "rejectInvite", fallback: false });
     }
   }, []);
 
@@ -254,7 +249,7 @@ export function useWorkspace({ onToast }) {
       setMembers(m => m.map(x => x.uid === memberUid ? { ...x, role: newRole } : x));
       onToast("✅ Ruolo aggiornato");
     } catch (e) {
-      onToast("❌ Errore: " + e.message);
+      handleError(e, { context: "changeMemberRole", onToast });
     }
   }, [workspace, onToast]);
 
@@ -267,7 +262,7 @@ export function useWorkspace({ onToast }) {
       setMembers(m => m.filter(x => x.uid !== memberUid));
       onToast("✅ Membro rimosso");
     } catch (e) {
-      onToast("❌ Errore: " + e.message);
+      handleError(e, { context: "removeMember", onToast });
     }
   }, [workspace, onToast]);
 
@@ -279,7 +274,7 @@ export function useWorkspace({ onToast }) {
       setWorkspace(w => ({ ...w, name: newName.trim() }));
       onToast("✅ Nome aggiornato");
     } catch (e) {
-      onToast("❌ Errore: " + e.message);
+      handleError(e, { context: "updateWorkspaceName", onToast });
     }
   }, [workspace, onToast]);
 

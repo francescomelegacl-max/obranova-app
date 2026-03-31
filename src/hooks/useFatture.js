@@ -2,6 +2,7 @@
 import { useState, useCallback } from "react";
 import { doc, setDoc, collection, getDocs, deleteDoc, updateDoc } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
+import { handleError } from "../utils/errorHandler";
 
 export function useFatture({ onToast, workspaceId }) {
   const [fatture, setFatture] = useState([]);
@@ -19,7 +20,7 @@ export function useFatture({ onToast, workspaceId }) {
       snap.forEach(d => list.push({ id: d.id, ...d.data() }));
       list.sort((a, b) => (b.creadoAt || "").localeCompare(a.creadoAt || ""));
       setFatture(list);
-    } catch (e) { console.error("loadFatture:", e); }
+    } catch (e) { handleError(e, { context: "loadFatture", onToast }); }
   }, [workspaceId]);
 
   const creaFattura = useCallback(async (dati) => {
@@ -30,8 +31,7 @@ export function useFatture({ onToast, workspaceId }) {
       setFatture(f => [{ id: ref.id, ...dati }, ...f]);
       onToast("✅ Fattura creata!");
     } catch (e) {
-      console.error("creaFattura:", e);
-      onToast("⚠️ Errore: " + e.message);
+      handleError(e, { context: "creaFattura", onToast });
     }
   }, [workspaceId, onToast]);
 
@@ -41,7 +41,7 @@ export function useFatture({ onToast, workspaceId }) {
       await updateDoc(doc(db, base, "fatture", id), { pagata, pagatoAt: pagata ? new Date().toISOString() : null });
       setFatture(f => f.map(x => x.id === id ? { ...x, pagata, pagatoAt: pagata ? new Date().toISOString() : null } : x));
       onToast(pagata ? "✅ Fattura segnata come pagata" : "↩ Pagamento annullato");
-    } catch (e) { onToast("⚠️ Errore: " + e.message); }
+    } catch (e) { handleError(e, { context: "togglePagata", onToast }); }
   }, [workspaceId, onToast]);
 
   const eliminaFattura = useCallback(async (id) => {
@@ -51,7 +51,7 @@ export function useFatture({ onToast, workspaceId }) {
       await deleteDoc(doc(db, base, "fatture", id));
       setFatture(f => f.filter(x => x.id !== id));
       onToast("🗑️ Fattura eliminata");
-    } catch (e) { onToast("⚠️ Errore: " + e.message); }
+    } catch (e) { handleError(e, { context: "eliminaFattura", onToast }); }
   }, [workspaceId, onToast]);
 
   return { fatture, loadFatture, creaFattura, togglePagata, eliminaFattura };

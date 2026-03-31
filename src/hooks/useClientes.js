@@ -11,6 +11,7 @@ import {
   serverTimestamp, query, orderBy,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { handleError } from "../utils/errorHandler";
 
 export const ESTADOS_CRM = ["lead", "cotizacion", "negociacion", "cerrado", "perdido"];
 
@@ -93,7 +94,7 @@ export function useClientes({ workspaceId, proyectos = [], plan } = {}) {
         setClientes(merged);
         setCargando(false);
       },
-      (err) => { setError(err.message); setCargando(false); }
+      (err) => { handleError(err, { context: "onSnapshot:clientes" }); setError(err.message); setCargando(false); }
     );
     return unsub;
   }, [workspaceId, isPro, proyectos.length]);
