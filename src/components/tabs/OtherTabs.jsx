@@ -200,7 +200,7 @@ export function TabResumen({ partidas, pct, cats, iva, t, descuento = { tipo: "p
 
 // ─── TabVistaCliente ──────────────────────────────────────────────────────────
 
-export function TabVistaCliente({ info, partidas, pct, cats, catVis = {}, getCatVis, setCatVisKey, iva, estado, currentId, validez, t, onInviaFirma, firme = [], fotos = [], plan = "free", trialEndsAt = null, onTrackPdf, descuento = { tipo: "pct", valor: 0, descripcion: "" }, setDescuento, aiRenders = [], workspaceId, onShowBenchmark }) {
+export function TabVistaCliente({ info, partidas, pct, cats, catVis = {}, setCatVisKey, iva, estado, currentId, validez, t, onInviaFirma, firme = [], fotos = [], plan = "free", trialEndsAt = null, onTrackPdf, descuento = { tipo: "pct", valor: 0, descripcion: "" }, setDescuento, aiRenders = [], workspaceId, onShowBenchmark }) {
   const pdf = usePDFSettings();
   const isTrialActive = trialEndsAt && new Date(trialEndsAt) > new Date();
   const isPro = plan === "pro" || plan === "empresa" || isTrialActive;
@@ -213,10 +213,11 @@ export function TabVistaCliente({ info, partidas, pct, cats, catVis = {}, getCat
     return partidas.filter(p => {
       if (p.visible === false) return false;
       if (p.cant * p.pu <= 0) return false;
-      const cv = getCatVis(p.cat);
-      return cv.visible;
+      const stored = catVis?.[p.cat];
+      if (!stored || typeof stored !== "object") return stored !== false;
+      return stored.visible !== false;
     });
-  }, [partidas, catVis]); // eslint-disable-line
+  }, [partidas, catVis]);
   const totals = useMemo(() => calcTotals(clientPartidas, pct, descuento), [clientPartidas, pct, descuento]);
   const { cd, ci, gf, imprevistos: imprev, sub, util, total, descuentoAmt, totalConDesc, iva: ivaAmt, totalIva } = totals;
 
@@ -419,7 +420,10 @@ _${info?.empresa||"Obra Nova"}_`;
         <div style={{ fontWeight: 700, fontSize: 13, color: "#1a365d", marginBottom: 10 }}>⚙️ {t.visTitulo}</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {cats.map((cat, i) => {
-            const cv = getCatVis(cat);
+            const stored = catVis?.[cat];
+            const cv = (!stored || typeof stored !== "object")
+              ? { visible: stored !== false, modo: "detalle" }
+              : { visible: stored.visible !== false, modo: stored.modo || "detalle" };
             return (
               <div key={cat} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", background: cv.visible ? "#f7fafc" : "#fafafa", borderRadius: 9, border: `1px solid ${cv.visible ? CC[i % CC.length] + "44" : "#e2e8f0"}`, opacity: cv.visible ? 1 : 0.6 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: cv.visible ? "#2d3748" : "#a0aec0" }}>{cat}</span>
@@ -581,12 +585,14 @@ _${empresaEnviar}_`;
         {/* Partidas por categoría */}
         <div style={{ marginBottom: 18, position: "relative", zIndex: 1 }}>
           {cats.map((cat, ci) => {
-            const cv = getCatVis(cat);
+            const stored = catVis?.[cat];
+            const cv = (!stored || typeof stored !== "object")
+              ? { visible: stored !== false, modo: "detalle" }
+              : { visible: stored.visible !== false, modo: stored.modo || "detalle" };
             if (!cv.visible) return null;
             const vis = clientPartidas.filter(p => p.cat === cat);
             if (!vis.length) return null;
             const catTotal = vis.reduce((s, p) => s + p.cant * p.pu, 0);
-            const catColor = CC[ci % CC.length];
             return (
               <div key={cat} style={{ marginBottom: 14 }}>
                 <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",background:pdf.colorPrimario,color:"white",padding:"6px 12px",borderRadius:"8px 8px 0 0" }}>

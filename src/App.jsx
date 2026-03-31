@@ -589,11 +589,6 @@ export default function App() {
           <TabVistaCliente
             info={proyState.info} partidas={proyState.partidas} pct={proyState.pct}
             cats={cats} catVis={proyState.catVis}
-            getCatVis={(c) => {
-              const stored = proyState.catVis?.[c];
-              if (!stored || typeof stored !== "object") return { visible: stored !== false, modo: "detalle" };
-              return { visible: stored.visible !== false, modo: stored.modo || "detalle" };
-            }}
             setCatVisKey={(c, key, value) => {
               setProyState(s => {
                 const prev = s.catVis || {};

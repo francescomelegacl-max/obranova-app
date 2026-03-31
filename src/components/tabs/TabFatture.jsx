@@ -2,21 +2,9 @@
 import { useState, useMemo } from "react";
 import { EMPRESA, CAT_COLORS } from "../../utils/constants";
 import { LOGO_URL } from "../../utils/logo";
+import { fmt as fmtHelper, calcTotals } from "../../utils/helpers";
 
 const fmt = (n) => n == null ? "—" : Number(n).toLocaleString("es-CL", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-
-function calcTotals(partidas, pct) {
-  const cd = (partidas || []).filter(p => p.visible !== false).reduce((s, p) => s + (p.cant || 0) * (p.pu || 0), 0);
-  const ci = cd * (pct.ci || 0) / 100;
-  const gf = cd * (pct.gf || 0) / 100;
-  const imprev = cd * (pct.imprevistos || 0) / 100;
-  const sub = cd + ci + gf + imprev;
-  const util = sub * (pct.utilidad || 0) / 100;
-  const total = sub + util;
-  const ivaAmt = total * 0.19;
-  const totalIva = total + ivaAmt;
-  return { cd, ci, gf, imprev, sub, util, total, ivaAmt, totalIva };
-}
 
 // Lee configuración tributaria
 function getEmpresaSettings() {
@@ -31,8 +19,8 @@ function getEmpresaSettings() {
 function ModalNuovaFattura({ proy, prossimoNumero, onSalva, onClose }) {
   const empresa       = getEmpresaSettings();
   const esHonorarios  = empresa.tipoContribuyente === "persona_natural";
-  const totals        = calcTotals(proy.partidas, proy.pct);
-  const neto          = totals.total;
+  const totals        = calcTotals(proy.partidas, proy.pct, proy.descuento);
+  const neto          = totals.totalConDesc;
   const retencion     = esHonorarios ? Math.round(neto * 0.10) : 0;
   const totale        = esHonorarios ? neto - retencion : (proy.iva ? totals.totalIva : neto);
 
@@ -43,7 +31,7 @@ function ModalNuovaFattura({ proy, prossimoNumero, onSalva, onClose }) {
     note:            "",
     importe:         totale,
     retencion:       retencion,
-    iva:             esHonorarios ? 0 : (proy.iva ? Math.round(totals.ivaAmt) : 0),
+    iva:             esHonorarios ? 0 : (proy.iva ? Math.round(totals.iva) : 0),
   });
 
   return (
@@ -73,7 +61,7 @@ function ModalNuovaFattura({ proy, prossimoNumero, onSalva, onClose }) {
             {!esHonorarios && proy.iva && (
               <div>
                 <div style={{ fontSize: 10, color: "#a0aec0" }}>IVA 19%</div>
-                <div style={{ fontWeight: 700, color: "#c05621" }}>{fmt(Math.round(totals.ivaAmt))}</div>
+                <div style={{ fontWeight: 700, color: "#c05621" }}>{fmt(Math.round(totals.iva))}</div>
               </div>
             )}
             <div>
@@ -126,7 +114,7 @@ function ModalNuovaFattura({ proy, prossimoNumero, onSalva, onClose }) {
 function PDFFattura({ fattura, proy, onClose }) {
   const empresa      = getEmpresaSettings();
   const esHonorarios = fattura.tipoContribuyente === "persona_natural" || fattura.esHonorarios;
-  const totals       = calcTotals(proy.partidas, proy.pct);
+  const totals       = calcTotals(proy.partidas, proy.pct, proy.descuento);
 
   // Datos emisor: usa empresa_settings si disponible, fallback a constantes
   const emisor = {
@@ -139,9 +127,9 @@ function PDFFattura({ fattura, proy, onClose }) {
     email:     empresa.email      || EMPRESA.email,
   };
 
-  const neto      = Math.round(totals.total);
+  const neto      = Math.round(totals.totalConDesc);
   const retencion = esHonorarios ? Math.round(neto * 0.10) : 0;
-  const iva       = (!esHonorarios && proy.iva) ? Math.round(totals.ivaAmt) : 0;
+  const iva       = (!esHonorarios && proy.iva) ? Math.round(totals.iva) : 0;
   const totalDoc  = esHonorarios ? neto - retencion : (proy.iva ? Math.round(totals.totalIva) : neto);
 
   return (
@@ -235,7 +223,7 @@ function PDFFattura({ fattura, proy, onClose }) {
                 ["Base imponible", totals.cd],
                 proy.pct?.ci > 0        && [`C.Indirectos (${proy.pct.ci}%)`,        totals.ci],
                 proy.pct?.gf > 0        && [`Gastos fijos (${proy.pct.gf}%)`,         totals.gf],
-                proy.pct?.imprevistos>0 && [`Imprevistos (${proy.pct.imprevistos}%)`, totals.imprev],
+                proy.pct?.imprevistos>0 && [`Imprevistos (${proy.pct.imprevistos}%)`, totals.imprevistos],
                 proy.pct?.utilidad > 0  && [`Utilidad (${proy.pct.utilidad}%)`,        totals.util],
                 ["Monto Neto", neto, true],
                 esHonorarios && ["Retención 10% (SII)", -retencion, false, false, "#553c9a"],
@@ -400,8 +388,8 @@ export function TabFatture({ proyectos, fatture, onCreaFattura, onTogglePagata, 
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {proyAceptados.map(p => {
-              const totals   = calcTotals(p.partidas, p.pct);
-              const tot      = p.iva ? totals.totalIva : totals.total;
+              const totals   = calcTotals(p.partidas, p.pct, p.descuento);
+              const tot      = p.iva ? totals.totalIva : totals.totalConDesc;
               const hasFattura = fatture.some(f => f.proyectoId === p.id);
               return (
                 <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#f7fafc", borderRadius: 9, flexWrap: "wrap", gap: 8 }}>
